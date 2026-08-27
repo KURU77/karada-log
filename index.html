@@ -144,6 +144,28 @@ svg.body .part.sel>*{stroke:var(--accent);stroke-width:2.8}
 .empty{color:var(--muted);font-size:14px;text-align:center;padding:24px 8px;line-height:1.75}
 .daygroup h3{font-size:13px;margin:0 0 2px;color:var(--accent);font-weight:700;letter-spacing:.03em}
 
+/* --- 治療・服薬 --- */
+.tx{border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:var(--panel-2);margin-top:8px;
+  border-left:4px solid var(--accent)}
+.tx.past{border-left-color:var(--line)}
+.tx .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.txkind{font-size:11.5px;font-weight:700;color:#fff;background:var(--accent);padding:2px 9px;border-radius:999px;flex:0 0 auto}
+.tx.past .txkind{background:var(--muted)}
+.txperiod{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tx .acts{display:flex;gap:6px;margin-left:auto}
+.txtitle{font-weight:600;font-size:15.5px;margin-top:7px;line-height:1.5}
+.txmeta{font-size:13px;color:var(--muted);margin-top:3px}
+.txeffect{display:inline-block;margin-top:8px;font-size:12.5px;font-weight:700;padding:3px 10px;
+  border-radius:999px;border:1px solid var(--line)}
+.txeffect.better{color:#2fa37a;background:rgba(47,163,122,.10);border-color:rgba(47,163,122,.35)}
+.txeffect.slight{color:#4f9e86;background:rgba(47,163,122,.06);border-color:rgba(47,163,122,.25)}
+.txeffect.same{color:var(--muted)}
+.txeffect.worse{color:#dd4b4b;background:rgba(221,75,75,.10);border-color:rgba(221,75,75,.35)}
+.tx .memo{margin-top:8px;font-size:14.5px;white-space:pre-wrap}
+.subhead{font-size:12.5px;color:var(--muted);font-weight:700;letter-spacing:.04em;
+  margin:18px 0 0;padding-top:14px;border-top:1px solid var(--line)}
+.cell .txmark{width:14px;height:2.5px;border-radius:2px;background:var(--accent);opacity:.75}
+
 /* --- calendar --- */
 .calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .calhead .m{font-weight:700;font-size:16px}
@@ -247,6 +269,7 @@ label.fld{display:block;font-size:13px;color:var(--muted);margin:15px 0 7px;font
     </div>
     <nav id="tabs">
       <button data-tab="record" aria-selected="true">記録</button>
+      <button data-tab="tx" aria-selected="false">治療</button>
       <button data-tab="history" aria-selected="false">履歴</button>
       <button data-tab="calendar" aria-selected="false">カレンダー</button>
       <button data-tab="stats" aria-selected="false">統計</button>
@@ -319,6 +342,53 @@ label.fld{display:block;font-size:13px;color:var(--muted);margin:15px 0 7px;font
     </div>
   </section>
 
+  <!-- ============ 治療 ============ -->
+  <section id="tab-tx" class="hidden">
+    <div class="card" id="txFormCard">
+      <h2 id="txFormTitle">治療・服薬を記録する</h2>
+
+      <label class="fld">種類</label>
+      <div class="chips" id="txKinds"></div>
+
+      <label class="fld">内容</label>
+      <input type="text" id="txTitle" placeholder="例）ロキソプロフェン60mg ／ 頸椎レントゲン ／ 整形外科を受診">
+
+      <label class="fld">医療機関・診療科（任意）</label>
+      <input type="text" id="txPlace" placeholder="例）○○整形外科">
+
+      <label class="fld">期間</label>
+      <div class="row">
+        <input type="date" id="txDate" style="flex:1;min-width:130px;width:auto">
+        <span class="hint" style="margin:0;flex:0 0 auto">〜</span>
+        <input type="date" id="txUntil" style="flex:1;min-width:130px;width:auto">
+      </div>
+      <div class="chips" style="margin-top:8px">
+        <button class="chip" id="txOngoing" aria-pressed="false">いまも続いている</button>
+      </div>
+      <div class="hint">1日だけの受診や検査は、終了日を空のままにしてください。</div>
+
+      <label class="fld">関連する部位（任意）</label>
+      <select id="txPart"><option value="">指定なし</option></select>
+
+      <label class="fld">効果</label>
+      <div class="chips" id="txEffect"></div>
+
+      <label class="fld">メモ（説明された内容・副作用など）</label>
+      <textarea id="txMemo" placeholder="例）レントゲンでは骨に異常なし。姿勢と筋緊張が原因だろうとのこと。1日2回、食後に服用。"></textarea>
+
+      <div class="row" style="margin-top:16px">
+        <button class="btn ghost hidden" id="txCancel">キャンセル</button>
+        <button class="btn primary" id="txSave" style="flex:1">この内容で記録する</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 id="txListTitle">治療・服薬の記録</h2>
+      <select id="txFilter"><option value="">すべての種類</option></select>
+      <div id="txList"></div>
+    </div>
+  </section>
+
   <!-- ============ 履歴 ============ -->
   <section id="tab-history" class="hidden">
     <div class="card">
@@ -356,7 +426,8 @@ label.fld{display:block;font-size:13px;color:var(--muted);margin:15px 0 7px;font
         <button class="btn iconbtn" id="mNext">›</button>
       </div>
       <div class="cal" id="cal"></div>
-      <div class="hint">日付をタップすると、その日の記録画面へ移動します。</div>
+      <div class="hint">日付をタップすると、その日の記録画面へ移動します。<br>
+        丸は症状の記録（色＝つらさ）、下の細い線はその日に受けていた治療・服薬です。</div>
     </div>
     <div class="card">
       <h2>この月のまとめ</h2>
@@ -493,10 +564,14 @@ label.fld{display:block;font-size:13px;color:var(--muted);margin:15px 0 7px;font
       <p class="hint" style="margin-top:0">記録はこの端末のブラウザ内（localStorage）にだけ保存されます。どこにも送信されません。端末の買い替えやブラウザデータの削除に備えて、ときどき書き出しておくと安心です。</p>
       <div class="row" style="margin-top:10px">
         <button class="btn" id="expJson">JSONで書き出し</button>
-        <button class="btn" id="expCsv">CSVで書き出し</button>
         <button class="btn" id="impBtn">JSONを読み込み</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="expCsv">症状をCSVで書き出し</button>
+        <button class="btn" id="expCsvTx">治療歴をCSVで書き出し</button>
         <input type="file" id="impFile" accept="application/json,.json" class="hidden">
       </div>
+      <p class="hint">JSONには症状の記録と治療歴の両方が入ります。以前の形式（症状だけの配列）も読み込めます。</p>
     </div>
     <div class="card">
       <h2>受診メモ用テキスト</h2>
@@ -528,6 +603,7 @@ label.fld{display:block;font-size:13px;color:var(--muted);margin:15px 0 7px;font
 
 /* ---------------- constants ---------------- */
 var KEY='karada-log-v1';
+var TX_KEY='karada-log-tx-v1';
 var SEV_COLORS=['','#8fd3b6','#f2d06b','#f0a35e','#e8794f','#dd4b4b'];
 var SEV_LABELS=['','ごく軽い','軽い','ふつう','強い','とても強い'];
 
@@ -562,8 +638,18 @@ var BACK=FRONT.map(function(p,i){ var q={}; for(var k in p) q[k]=p[k]; q.n=BACK_
 var OTHER_PARTS=['目','耳','鼻','口・歯','のど','髪・頭皮','顔','動悸・胸の奥','胃','腸・お通じ','皮膚（全身）','関節（全身）','気分・メンタル','睡眠','全身・発熱','その他'];
 var SYMPTOMS=['痛み','ズキズキ','鈍い痛み','かゆみ','しびれ','はれ・むくみ','発疹・赤み','こわばり','熱っぽい','だるさ','出血','めまい','吐き気','せき','違和感'];
 
+var TX_KINDS=['受診','検査','処方薬','市販薬','処置・リハビリ','セルフケア','その他'];
+var EFFECTS=[
+  {v:'better', l:'効いた'},
+  {v:'slight', l:'やや効いた'},
+  {v:'same',   l:'変わらない'},
+  {v:'worse',  l:'悪化した'}
+];
+
 /* ---------------- state ---------------- */
 var records=load();
+var treatments=loadTx();
+var txState={ kind:TX_KINDS[0], effect:'', ongoing:false, editingId:null };
 var now=new Date();
 var state={
   date: today(), view:'front', part:null, scope:'day', tab:'record',
@@ -582,8 +668,20 @@ function load(){
     return Array.isArray(a)?a:[];
   }catch(e){ return []; }
 }
+function loadTx(){
+  try{
+    var raw=localStorage.getItem(TX_KEY);
+    if(!raw) return [];
+    var a=JSON.parse(raw);
+    return Array.isArray(a)?a:[];
+  }catch(e){ return []; }
+}
 function persist(){
   try{ localStorage.setItem(KEY, JSON.stringify(records)); }
+  catch(e){ alert('保存できませんでした。ブラウザの空き容量やプライベートモードの設定をご確認ください。'); }
+}
+function persistTx(){
+  try{ localStorage.setItem(TX_KEY, JSON.stringify(treatments)); }
   catch(e){ alert('保存できませんでした。ブラウザの空き容量やプライベートモードの設定をご確認ください。'); }
 }
 function pad(n){ return (n<10?'0':'')+n; }
@@ -682,8 +780,101 @@ function renderDayList(){
   var list=records.filter(function(r){ return r.date===state.date; })
                   .sort(function(a,b){ return (a.createdAt||0)-(b.createdAt||0); });
   $('dayListTitle').textContent=jpShort(state.date)+'の記録（'+list.length+'件）';
-  $('dayList').innerHTML = list.length ? list.map(recHTML).join('')
+  var html = list.length ? list.map(recHTML).join('')
     : '<div class="empty">この日の記録はまだありません。<br>人体図から部位を選んで記録できます。</div>';
+
+  /* その日に受けていた治療・飲んでいた薬も並べる */
+  var tx=treatments.filter(function(t){ return txActiveOn(t, state.date); })
+                   .sort(function(a,b){ return a.date<b.date?1:-1; });
+  if(tx.length){
+    html+='<div class="subhead">この日の治療・服薬（'+tx.length+'件）</div>'+tx.map(txHTML).join('');
+  }
+  $('dayList').innerHTML=html;
+}
+
+/* ---------------- 治療・服薬 ---------------- */
+function txPeriod(t){
+  var s=jpShort(t.date);
+  if(t.ongoing) return s+' 〜 いまも継続';
+  if(t.until && t.until!==t.date) return s+' 〜 '+jpShort(t.until);
+  return s;
+}
+/* その日に効いていた治療か（1日だけの受診・検査はその日のみ） */
+function txActiveOn(t, date){
+  if(t.date>date) return false;
+  if(t.ongoing) return date<=today();   /* 継続中でも、まだ来ていない日は塗らない */
+  if(t.until) return date<=t.until;
+  return t.date===date;
+}
+/* 期間が窓と少しでも重なるか */
+function txOverlaps(t, from, to){
+  if(t.date>to) return false;
+  var end = t.ongoing ? '9999-12-31' : (t.until || t.date);
+  return end>=from;
+}
+function txIsPast(t){
+  return !t.ongoing && (t.until || t.date) < today();
+}
+function txHTML(t){
+  var eff=EFFECTS.filter(function(e){ return e.v===t.effect; })[0];
+  var meta=[t.place, t.part].filter(Boolean).join('・');
+  return '<div class="tx'+(txIsPast(t)?' past':'')+'" data-id="'+esc(t.id)+'">'
+    + '<div class="top"><span class="txkind">'+esc(t.kind)+'</span>'
+    + '<span class="txperiod">'+esc(txPeriod(t))+'</span>'
+    + '<div class="acts"><button class="btn sm" data-act="edit">編集</button>'
+    + '<button class="btn sm danger" data-act="del">削除</button></div></div>'
+    + '<div class="txtitle">'+esc(t.title)+'</div>'
+    + (meta?'<div class="txmeta">'+esc(meta)+'</div>':'')
+    + (eff?'<span class="txeffect '+eff.v+'">'+esc(eff.l)+'</span>':'')
+    + (t.memo?'<div class="memo">'+esc(t.memo)+'</div>':'')
+  + '</div>';
+}
+function renderTxForm(){
+  $('txKinds').innerHTML=TX_KINDS.map(function(k){
+    return '<button class="chip" data-kind="'+esc(k)+'" aria-pressed="'+(txState.kind===k)+'">'+esc(k)+'</button>';
+  }).join('');
+  $('txEffect').innerHTML=EFFECTS.map(function(e){
+    return '<button class="chip" data-eff="'+e.v+'" aria-pressed="'+(txState.effect===e.v)+'">'+esc(e.l)+'</button>';
+  }).join('');
+  $('txOngoing').setAttribute('aria-pressed', String(txState.ongoing));
+  $('txUntil').disabled=txState.ongoing;
+  $('txUntil').style.opacity=txState.ongoing?'.45':'1';
+  $('txSave').textContent=txState.editingId?'この内容に更新する':'この内容で記録する';
+  $('txFormTitle').textContent=txState.editingId?'治療・服薬を編集中':'治療・服薬を記録する';
+  $('txCancel').classList.toggle('hidden', !txState.editingId);
+
+  var known={};
+  FRONT.concat(BACK).forEach(function(p){ known[p.n]=1; });
+  OTHER_PARTS.forEach(function(p){ known[p]=1; });
+  records.forEach(function(r){ known[r.part]=1; });
+  var keep=$('txPart').value;
+  $('txPart').innerHTML='<option value="">指定なし</option>'
+    + Object.keys(known).map(function(p){ return '<option>'+esc(p)+'</option>'; }).join('');
+  $('txPart').value=keep;
+}
+function renderTxList(){
+  var kinds={};
+  treatments.forEach(function(t){ kinds[t.kind]=1; });
+  var keep=$('txFilter').value;
+  $('txFilter').innerHTML='<option value="">すべての種類</option>'
+    + Object.keys(kinds).sort().map(function(k){ return '<option>'+esc(k)+'</option>'; }).join('');
+  $('txFilter').value=keep;
+
+  var f=$('txFilter').value;
+  var list=treatments.filter(function(t){ return !f || t.kind===f; })
+    .sort(function(a,b){
+      if(a.ongoing!==b.ongoing) return a.ongoing?-1:1;
+      return a.date<b.date?1:a.date>b.date?-1:(b.createdAt||0)-(a.createdAt||0);
+    });
+  $('txListTitle').textContent='治療・服薬の記録（'+list.length+'件）';
+  $('txList').innerHTML = list.length ? list.map(txHTML).join('')
+    : '<div class="empty">まだ記録がありません。<br>受診・検査・お薬・リハビリなどを残せます。</div>';
+}
+function renderTx(){ renderTxForm(); renderTxList(); }
+function resetTxForm(){
+  txState={ kind:TX_KINDS[0], effect:'', ongoing:false, editingId:null };
+  $('txTitle').value=''; $('txPlace').value=''; $('txMemo').value='';
+  $('txDate').value=today(); $('txUntil').value=''; $('txPart').value='';
 }
 
 /* ---------------- history ---------------- */
@@ -755,9 +946,11 @@ function renderCalendar(){
   for(var d=1; d<=last; d++){
     var ds=fmt(new Date(y,m,d)), rs=byDay[d]||[];
     var dots=rs.slice(0,4).map(function(r){ return '<i style="background:'+SEV_COLORS[r.sev]+'"></i>'; }).join('');
+    var hasTx=treatments.some(function(t){ return txActiveOn(t, ds); });
     html+='<div class="cell'+(rs.length?' has':'')+(ds===tdy?' today':'')+'" data-date="'+ds+'">'
         + '<span class="n">'+d+'</span><span class="dots">'+dots+'</span>'
         + (rs.length>4?'<span style="font-size:9px;color:var(--muted)">+'+(rs.length-4)+'</span>':'')
+        + (hasTx?'<span class="txmark"></span>':'')
         + '</div>';
   }
   $('cal').innerHTML=html;
@@ -986,8 +1179,13 @@ function aiPrompt(){
     '断定せず「〜の可能性があります」という書き方で、多くても3つまで。',
     'それぞれ、記録のどの部分をふまえた話なのかを必ず添えてください。',
     '',
+    '## 治療とのつながり',
+    '治療・服薬の記録がある場合のみ、その開始や終了と症状の変化に時間的な重なりがあるかを述べてください。',
+    '因果関係は断定せず、記録がない場合はこの見出しごと省いてください。',
+    '',
     '## 生活のなかでできる工夫',
     '一般的なセルフケアを具体的に。市販薬にふれる場合は「薬剤師に相談のうえ」と添えてください。',
+    'すでに受けている治療と重複したり、矛盾したりする提案は避けてください。',
     '',
     '## 受診の目安',
     'どのくらい続いたら、どの診療科にかかるとよいかを具体的に。',
@@ -1003,8 +1201,10 @@ function aiPrompt(){
     '- 全体で800字程度。見出しは ## を使う。'
   ].join('\n');
 
-  var meta='## 記録（'+$('aiRange').value+'日ぶん'+(part?'／'+part+'のみ':'')+'・本日は'+jpFull(today())+'）';
-  return head+'\n\n'+meta+'\n'+aiBody(list)+(note?'\n\n## 本人からの補足\n'+note:'');
+  var meta='## 症状の記録（'+$('aiRange').value+'日ぶん'+(part?'／'+part+'のみ':'')+'・本日は'+jpFull(today())+'）';
+  var txl=txLines(daysAgo(+$('aiRange').value-1), today(), '');
+  var txSec = txl.length ? '\n\n## 同じ期間の治療・服薬\n'+txl.join('\n') : '';
+  return head+'\n\n'+meta+'\n'+aiBody(list)+txSec+(note?'\n\n## 本人からの補足\n'+note:'');
 }
 function geminiFetch(path, opts){
   var key=lsGet(AI_KEY);
@@ -1141,6 +1341,7 @@ function render(){
   $('dateLabel').textContent=jpFull(state.date)+(state.date===today()?'（今日）':'');
   $('brandSub').textContent='記録 '+records.length+'件';
   renderBody(); renderChips(); renderForm(); renderDayList();
+  if(state.tab==='tx') renderTx();
   if(state.tab==='history') renderHistory();
   if(state.tab==='calendar') renderCalendar();
   if(state.tab==='stats') renderStats();
@@ -1156,7 +1357,7 @@ $('tabs').addEventListener('click',function(e){
   Array.prototype.forEach.call(this.querySelectorAll('button'),function(x){
     x.setAttribute('aria-selected', String(x===b));
   });
-  ['record','history','calendar','stats','compare','ai','data'].forEach(function(t){
+  ['record','tx','history','calendar','stats','compare','ai','data'].forEach(function(t){
     $('tab-'+t).classList.toggle('hidden', t!==state.tab);
   });
   window.scrollTo(0,0);
@@ -1271,6 +1472,71 @@ $('cGranSeg').addEventListener('click',function(e){
   renderCompare();
 });
 
+/* --- 治療・服薬 --- */
+$('txKinds').addEventListener('click',function(e){
+  var b=e.target.closest('button[data-kind]'); if(!b) return;
+  txState.kind=b.getAttribute('data-kind'); renderTxForm();
+});
+$('txEffect').addEventListener('click',function(e){
+  var b=e.target.closest('button[data-eff]'); if(!b) return;
+  var v=b.getAttribute('data-eff');
+  txState.effect = (txState.effect===v) ? '' : v;
+  renderTxForm();
+});
+$('txOngoing').onclick=function(){
+  txState.ongoing=!txState.ongoing;
+  if(txState.ongoing) $('txUntil').value='';
+  renderTxForm();
+};
+$('txFilter').addEventListener('change', renderTxList);
+$('txCancel').onclick=function(){ resetTxForm(); renderTx(); };
+$('txSave').onclick=function(){
+  var title=$('txTitle').value.trim();
+  if(!title){ alert('内容を入力してください。（例：ロキソプロフェン60mg、整形外科を受診）'); $('txTitle').focus(); return; }
+  var date=$('txDate').value;
+  if(!date){ alert('開始日を入力してください。'); $('txDate').focus(); return; }
+  var until=txState.ongoing ? '' : $('txUntil').value;
+  if(until && until<date){ alert('終了日は開始日より後にしてください。'); $('txUntil').focus(); return; }
+
+  var data={
+    kind:txState.kind, date:date, until:until, ongoing:txState.ongoing,
+    title:title, place:$('txPlace').value.trim(), part:$('txPart').value,
+    effect:txState.effect, memo:$('txMemo').value.trim()
+  };
+  if(txState.editingId){
+    treatments.forEach(function(t){ if(t.id===txState.editingId){ for(var k in data) t[k]=data[k]; } });
+  }else{
+    data.id=uid(); data.createdAt=Date.now();
+    treatments.push(data);
+  }
+  persistTx(); resetTxForm(); render();
+  $('txList').scrollIntoView({behavior:'smooth', block:'nearest'});
+};
+function txAction(e){
+  var b=e.target.closest('button[data-act]'); if(!b) return;
+  var host=b.closest('.tx'); if(!host) return;
+  var id=host.getAttribute('data-id'), t=null;
+  treatments.forEach(function(x){ if(x.id===id) t=x; });
+  if(!t) return;
+  if(b.getAttribute('data-act')==='del'){
+    if(!confirm('「'+t.title+'」の記録を削除しますか？')) return;
+    treatments=treatments.filter(function(x){ return x.id!==id; });
+    if(txState.editingId===id) resetTxForm();
+    persistTx(); render();
+    return;
+  }
+  txState={ kind:t.kind, effect:t.effect||'', ongoing:!!t.ongoing, editingId:id };
+  $('txTitle').value=t.title||''; $('txPlace').value=t.place||''; $('txMemo').value=t.memo||'';
+  $('txDate').value=t.date; $('txUntil').value=t.until||'';
+  renderTxForm();
+  $('txPart').value=t.part||'';
+  if(state.tab!=='tx') $('tabs').querySelector('button[data-tab="tx"]').click();
+  else renderTxList();
+  $('txFormCard').scrollIntoView({behavior:'smooth', block:'start'});
+}
+$('txList').addEventListener('click', txAction);
+$('dayList').addEventListener('click', txAction);
+
 $('aiKeySave').onclick=function(){
   var v=$('aiKey').value.trim();
   if(!v){ alert('APIキーを入力してください。'); return; }
@@ -1302,16 +1568,34 @@ function download(name, text, type){
   document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.parentNode.removeChild(a); }, 0);
 }
-$('expJson').onclick=function(){ download('karada-log-'+today()+'.json', JSON.stringify(records,null,2)); };
-$('expCsv').onclick=function(){
-  var sorted=records.slice().sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:0; });
-  var rows=[['日付','部位','つらさ','症状','メモ']].concat(sorted.map(function(r){
-    return [r.date, r.part, r.sev, (r.syms||[]).join(' / '), (r.memo||'').replace(/\n/g,' ')];
-  }));
-  var csv='﻿'+rows.map(function(row){
+function toCSV(rows){
+  return '﻿'+rows.map(function(row){
     return row.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(',');
   }).join('\r\n');
-  download('karada-log-'+today()+'.csv', csv, 'text/csv');
+}
+$('expJson').onclick=function(){
+  download('karada-log-'+today()+'.json', JSON.stringify({
+    version:2, exportedAt:new Date().toISOString(), records:records, treatments:treatments
+  }, null, 2));
+};
+$('expCsv').onclick=function(){
+  var sorted=records.slice().sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:0; });
+  download('karada-log-'+today()+'.csv', toCSV(
+    [['日付','部位','つらさ','症状','メモ']].concat(sorted.map(function(r){
+      return [r.date, r.part, r.sev, (r.syms||[]).join(' / '), (r.memo||'').replace(/\n/g,' ')];
+    }))
+  ), 'text/csv');
+};
+$('expCsvTx').onclick=function(){
+  if(!treatments.length){ alert('治療歴の記録がありません。'); return; }
+  var sorted=treatments.slice().sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:0; });
+  download('karada-log-treatments-'+today()+'.csv', toCSV(
+    [['開始日','終了日','継続中','種類','内容','医療機関・診療科','関連部位','効果','メモ']].concat(sorted.map(function(t){
+      var eff=EFFECTS.filter(function(e){ return e.v===t.effect; })[0];
+      return [t.date, t.until||'', t.ongoing?'はい':'', t.kind, t.title, t.place||'', t.part||'',
+              eff?eff.l:'', (t.memo||'').replace(/\n/g,' ')];
+    }))
+  ), 'text/csv');
 };
 $('impBtn').onclick=function(){ $('impFile').click(); };
 $('impFile').addEventListener('change',function(){
@@ -1320,39 +1604,70 @@ $('impFile').addEventListener('change',function(){
   if(!f) return;
   var rd=new FileReader();
   rd.onload=function(){
-    var a;
-    try{ a=JSON.parse(rd.result); }catch(e){ a=null; }
-    if(!Array.isArray(a)){ alert('読み込めませんでした。このアプリで書き出したJSONファイルを選んでください。'); return; }
-    var clean=a.filter(function(r){ return r && r.date && r.part; }).map(function(r){
+    var j;
+    try{ j=JSON.parse(rd.result); }catch(e){ j=null; }
+    /* 旧形式（症状だけの配列）と新形式（{records, treatments}）の両方を受ける */
+    var srcRec = Array.isArray(j) ? j : (j && Array.isArray(j.records) ? j.records : null);
+    var hasTxField = !!(j && Array.isArray(j.treatments));
+    var srcTx  = hasTxField ? j.treatments : [];
+    if(!srcRec){ alert('読み込めませんでした。このアプリで書き出したJSONファイルを選んでください。'); return; }
+
+    var clean=srcRec.filter(function(r){ return r && r.date && r.part; }).map(function(r){
       return { id:r.id||uid(), date:r.date, part:r.part, syms:Array.isArray(r.syms)?r.syms:[],
                sev:Math.min(5,Math.max(1,+r.sev||3)), memo:r.memo||'', createdAt:r.createdAt||Date.now() };
     });
-    if(!clean.length){ alert('有効な記録が見つかりませんでした。'); return; }
+    var cleanTx=srcTx.filter(function(t){ return t && t.date && t.title; }).map(function(t){
+      return { id:t.id||uid(), kind:TX_KINDS.indexOf(t.kind)>=0?t.kind:'その他', date:t.date,
+               until:t.until||'', ongoing:!!t.ongoing, title:t.title, place:t.place||'',
+               part:t.part||'', effect:t.effect||'', memo:t.memo||'', createdAt:t.createdAt||Date.now() };
+    });
+    if(!clean.length && !cleanTx.length){ alert('有効な記録が見つかりませんでした。'); return; }
+
     var addMode=confirm('OK：いまの記録に追加して読み込みます\nキャンセル：いまの記録を置き換えます');
     if(addMode){
       var have={};
       records.forEach(function(r){ have[r.id]=1; });
       clean.forEach(function(r){ if(!have[r.id]) records.push(r); });
+      var haveTx={};
+      treatments.forEach(function(t){ haveTx[t.id]=1; });
+      cleanTx.forEach(function(t){ if(!haveTx[t.id]) treatments.push(t); });
     }else{
       records=clean;
+      /* 旧形式のファイルは治療歴を含まない。置き換えでも既存の治療歴は消さない */
+      if(hasTxField) treatments=cleanTx;
     }
-    persist(); render();
-    alert('読み込みました（'+clean.length+'件）');
+    persist(); persistTx(); render();
+    alert('読み込みました（症状 '+clean.length+'件／治療歴 '
+      + (hasTxField ? cleanTx.length+'件' : 'このファイルには含まれていないため、いまの記録を残しました') + '）');
   };
   rd.readAsText(f);
 });
+function txLines(from, to, indent){
+  var list=treatments.filter(function(t){ return txOverlaps(t, from, to); })
+                     .sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:0; });
+  return list.map(function(t){
+    var eff=EFFECTS.filter(function(e){ return e.v===t.effect; })[0];
+    var extra=[t.place, t.part, eff?('効果：'+eff.l):''].filter(Boolean).join('／');
+    return indent+'・['+t.kind+'] '+t.title+'（'+txPeriod(t)+'）'+(extra?'　'+extra:'')
+         + (t.memo?'\n'+indent+'  '+t.memo.replace(/\n/g,'\n'+indent+'  '):'');
+  });
+}
 $('mkDoctor').onclick=function(){
-  var lim=daysAgo(29);
+  var lim=daysAgo(29), end=today();
   var list=records.filter(function(r){ return r.date>=lim; })
                   .sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:(a.createdAt||0)-(b.createdAt||0); });
-  if(!list.length){ $('doctorText').value='直近30日の記録はありません。'; return; }
+  var txl=txLines(lim, end, '  ');
+  if(!list.length && !txl.length){ $('doctorText').value='直近30日の記録はありません。'; return; }
+
   var byDate={}, order=[];
   list.forEach(function(r){
     if(!byDate[r.date]){ byDate[r.date]=[]; order.push(r.date); }
     byDate[r.date].push(r);
   });
-  var txt='【からだの記録】'+jpFull(order[0])+' 〜 '+jpFull(order[order.length-1])+'\n';
-  txt+='（記録 '+list.length+'件／'+order.length+'日分）\n\n';
+  var head=order.length ? jpFull(order[0])+' 〜 '+jpFull(order[order.length-1]) : jpFull(lim)+' 〜 '+jpFull(end);
+  var txt='【からだの記録】'+head+'\n（症状 '+list.length+'件／'+order.length+'日分・治療歴 '+txl.length+'件）\n\n';
+
+  if(txl.length) txt+='■ この期間の治療・服薬\n'+txl.join('\n')+'\n\n';
   order.forEach(function(d){
     txt+='■ '+jpFull(d)+'\n';
     byDate[d].forEach(function(r){
@@ -1374,11 +1689,15 @@ $('copyDoctor').onclick=function(){
   alert(ok?'コピーしました。':'コピーできませんでした。テキストを手動で選択してください。');
 };
 $('wipe').onclick=function(){
-  if(!records.length){ alert('記録はありません。'); return; }
-  if(!confirm('すべての記録（'+records.length+'件）を削除します。元に戻せません。よろしいですか？')) return;
+  if(!records.length && !treatments.length){ alert('記録はありません。'); return; }
+  if(!confirm('すべての記録（症状 '+records.length+'件・治療歴 '+treatments.length+'件）を削除します。'
+            + '元に戻せません。よろしいですか？')) return;
   if(!confirm('本当に削除してよろしいですか？')) return;
-  records=[]; persist(); resetForm(false); render();
+  records=[]; treatments=[];
+  persist(); persistTx(); resetForm(false); resetTxForm(); render();
 };
+
+resetTxForm();
 
 /* 前回選んだモデルを復元（一覧取得で増えたモデル名も拾えるように） */
 (function(){
