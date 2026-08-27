@@ -72,7 +72,7 @@ nav button[aria-selected="true"]{background:var(--accent);border-color:var(--acc
 .spacer{flex:1}
 /* iOS はフォント16px未満の入力にフォーカスすると自動ズームするため、16pxを下回らせない */
 input,select,textarea,button{font-family:inherit;font-size:16px;color:var(--text)}
-input[type=date],select,textarea,input[type=text]{
+input[type=date],select,textarea,input[type=text],input[type=password]{
   background:var(--panel-2); border:1px solid var(--line); border-radius:10px;
   padding:11px; width:100%; min-height:46px; -webkit-appearance:none; appearance:none;
 }
@@ -190,6 +190,31 @@ svg.body .part.sel>*{stroke:var(--accent);stroke-width:2.8}
 svg.trend{width:100%;height:auto;display:block;margin-top:12px}
 svg.trend text{fill:var(--muted);font-family:inherit}
 
+/* --- AI相談 --- */
+.card.warn{border-left:4px solid #e8a33d}
+.card.warn h2{color:#c9821f}
+.card.warn p{margin:0 0 10px;font-size:14px;line-height:1.7}
+.card.warn p:last-of-type{margin-bottom:0}
+ul.urgent{margin:0;padding-left:1.25em;font-size:14px;line-height:1.75;color:var(--text)}
+ul.urgent li{margin:2px 0}
+.aiout{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+.aiout h3{font-size:15.5px;margin:18px 0 7px;color:var(--accent);font-weight:700}
+.aiout h4,.aiout h5,.aiout h6{font-size:14.5px;margin:14px 0 6px;font-weight:700}
+.aiout p{margin:0 0 11px;font-size:14.5px;line-height:1.8}
+.aiout ul,.aiout ol{margin:0 0 11px;padding-left:1.35em;font-size:14.5px;line-height:1.8}
+.aiout li{margin:4px 0}
+.aiout code{background:var(--panel-2);border:1px solid var(--line);padding:1px 5px;border-radius:5px;font-size:13px}
+.aiout>*:first-child{margin-top:0}
+.aiout .src{font-size:12px;color:var(--muted);margin-top:14px;padding-top:10px;border-top:1px dashed var(--line)}
+.aierr{margin-top:14px;border:1px solid rgba(221,75,75,.45);background:rgba(221,75,75,.08);
+  color:#c33;border-radius:11px;padding:12px;font-size:14px;line-height:1.7;white-space:pre-wrap}
+@media (prefers-color-scheme: dark){ .aierr{color:#ff9b9b} }
+.aiload{display:flex;align-items:center;gap:10px;margin-top:16px;color:var(--muted);font-size:14px}
+.spinner{width:18px;height:18px;border:2.5px solid var(--line);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .8s linear infinite;flex:0 0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){ .spinner{animation-duration:2.4s} }
+
 .savebar{
   position:fixed;left:0;right:0;bottom:0;z-index:30;
   background:linear-gradient(to top,var(--bg) 62%,transparent);
@@ -221,11 +246,12 @@ label.fld{display:block;font-size:13px;color:var(--muted);margin:15px 0 7px;font
       <small id="brandSub"></small>
     </div>
     <nav id="tabs">
-      <button data-tab="record" aria-selected="true">記録する</button>
+      <button data-tab="record" aria-selected="true">記録</button>
       <button data-tab="history" aria-selected="false">履歴</button>
       <button data-tab="calendar" aria-selected="false">カレンダー</button>
       <button data-tab="stats" aria-selected="false">統計</button>
       <button data-tab="compare" aria-selected="false">くらべる</button>
+      <button data-tab="ai" aria-selected="false">AI相談</button>
       <button data-tab="data" aria-selected="false">データ</button>
     </nav>
   </header>
@@ -395,6 +421,68 @@ label.fld{display:block;font-size:13px;color:var(--muted);margin:15px 0 7px;font
       </div>
       <div id="cTrend"></div>
       <div class="hint">棒の高さが記録数、色がその期間の平均つらさです。</div>
+    </div>
+  </section>
+
+  <!-- ============ AI相談 ============ -->
+  <section id="tab-ai" class="hidden">
+    <div class="card warn">
+      <h2>はじめにお読みください</h2>
+      <p>AIの回答は<strong>診断ではありません</strong>。記録の整理と、受診を考える手がかりとして使ってください。
+        病名を決めたり、受診しない判断の根拠にしたりしないでください。</p>
+      <p style="margin-bottom:6px">次のような症状があるときは、AIに聞かずすぐに受診または119番通報を。</p>
+      <ul class="urgent">
+        <li>強い胸の痛み・締めつけ、息が苦しい</li>
+        <li>突然の激しい頭痛、ろれつが回らない、顔や手足の片側が動かない</li>
+        <li>意識がもうろうとする、けいれん</li>
+        <li>止まらない出血、我慢できないほどの痛み</li>
+        <li>高熱が続く、水分がとれない</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Gemini APIキー</h2>
+      <input type="password" id="aiKey" placeholder="AIza… で始まるキー" autocomplete="off" spellcheck="false">
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="aiKeySave">保存</button>
+        <button class="btn danger" id="aiKeyClear">削除</button>
+        <span class="spacer"></span>
+        <span class="hint" id="aiKeyState" style="margin:0"></span>
+      </div>
+      <p class="hint">キーは <strong>Google AI Studio</strong>（aistudio.google.com/apikey）で無料で発行できます。
+        入力したキーはこの端末のブラウザ（localStorage）にだけ保存され、Google以外には送信されません。
+        共用の端末では使い終わったら削除してください。</p>
+    </div>
+
+    <div class="card">
+      <h2>相談する内容</h2>
+      <label class="fld">対象の記録</label>
+      <div class="row">
+        <select id="aiRange" style="flex:1;min-width:130px;width:auto">
+          <option value="7">直近7日</option>
+          <option value="30" selected>直近30日</option>
+          <option value="90">直近90日</option>
+        </select>
+        <select id="aiPart" style="flex:1;min-width:130px;width:auto"><option value="">すべての部位</option></select>
+      </div>
+      <label class="fld">モデル</label>
+      <div class="row">
+        <select id="aiModel" style="flex:1;min-width:150px;width:auto">
+          <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+          <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+          <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
+        </select>
+        <button class="btn sm" id="aiModelList">一覧を取得</button>
+      </div>
+      <label class="fld">伝えたいこと（任意）</label>
+      <textarea id="aiNote" placeholder="例）40代・デスクワーク中心。高血圧で服薬中。先週から在宅勤務が増えた。"></textarea>
+      <div class="hint" id="aiScope"></div>
+    </div>
+
+    <div class="card">
+      <button class="btn primary" id="aiSend" style="width:100%">Geminiに送信して相談する</button>
+      <div class="hint" id="aiNotice">送信すると、上で選んだ範囲の記録がGoogleのGemini APIに送られます。</div>
+      <div id="aiOut"></div>
     </div>
   </section>
 
@@ -837,6 +925,216 @@ function renderCompare(){
   $('cTrend').innerHTML=trendSVG(part, state.cGran);
 }
 
+/* ---------------- AI相談（Gemini API） ---------------- */
+var AI_KEY='karada-log-gemini-key', AI_MODEL='karada-log-gemini-model', AI_OK='karada-log-ai-consent';
+var API_BASE='https://generativelanguage.googleapis.com/v1beta/';
+var aiBusy=false;
+
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
+
+function aiKeyState(){
+  var k=lsGet(AI_KEY);
+  $('aiKeyState').textContent = k ? '保存済み（…'+k.slice(-4)+'）' : '未設定';
+  $('aiKeyState').style.color = k ? '#2fa37a' : 'var(--muted)';
+}
+/* 対象の記録を、そのまま読める形に整える */
+function aiRecords(){
+  var n=+$('aiRange').value, part=$('aiPart').value, lim=daysAgo(n-1);
+  return records.filter(function(r){
+    if(part && r.part!==part) return false;
+    return r.date>=lim;
+  }).sort(function(a,b){
+    return a.date<b.date?-1:a.date>b.date?1:(a.createdAt||0)-(b.createdAt||0);
+  });
+}
+function aiScope(){
+  var list=aiRecords(), n=+$('aiRange').value;
+  var days={}; list.forEach(function(r){ days[r.date]=1; });
+  $('aiScope').textContent = list.length
+    ? '送信する記録：'+list.length+'件（'+Object.keys(days).length+'日分／直近'+n+'日）'
+    : 'この範囲に記録がありません。範囲を広げるか、先に記録してください。';
+  $('aiSend').disabled = !list.length;
+}
+function aiBody(list){
+  var byDate={}, order=[];
+  list.forEach(function(r){
+    if(!byDate[r.date]){ byDate[r.date]=[]; order.push(r.date); }
+    byDate[r.date].push(r);
+  });
+  return order.map(function(d){
+    return jpFull(d)+'\n'+byDate[d].map(function(r){
+      return '  - '+r.part+'：つらさ '+r.sev+'/5'
+        + ((r.syms||[]).length?'（'+r.syms.join('、')+'）':'')
+        + (r.memo?'　メモ: '+r.memo.replace(/\n/g,' '):'');
+    }).join('\n');
+  }).join('\n');
+}
+function aiPrompt(){
+  var list=aiRecords(), note=$('aiNote').value.trim(), part=$('aiPart').value;
+  var head=[
+    'あなたは、日本の生活者が自分の体調記録を読み解くのを手伝うアシスタントです。',
+    '医師ではないため、診断や治療の指示はできません。',
+    '',
+    '以下の「からだの記録」を読んで、次の見出しで日本語でまとめてください。',
+    '',
+    '## 記録から読み取れること',
+    'いつ・どこに・どのくらいの強さで症状が出ているか。時間帯や曜日の偏り、部位の集中、悪化と改善の流れを簡潔に。',
+    '',
+    '## 考えられる一般的な要因',
+    '断定せず「〜の可能性があります」という書き方で、多くても3つまで。',
+    'それぞれ、記録のどの部分をふまえた話なのかを必ず添えてください。',
+    '',
+    '## 生活のなかでできる工夫',
+    '一般的なセルフケアを具体的に。市販薬にふれる場合は「薬剤師に相談のうえ」と添えてください。',
+    '',
+    '## 受診の目安',
+    'どのくらい続いたら、どの診療科にかかるとよいかを具体的に。',
+    '',
+    '## すぐに受診・救急が必要なサイン',
+    'この記録に関連して、緊急性が高い症状を挙げてください。',
+    '',
+    '守ってほしいこと:',
+    '- 病名を断定しない。「あなたは○○です」とは書かない。',
+    '- 記録にない事実を作らない。判断材料が足りないときは「記録からは判断できません」と書く。',
+    '- 専門用語には短い説明を添える。',
+    '- 受診をためらわせる書き方はしない。',
+    '- 全体で800字程度。見出しは ## を使う。'
+  ].join('\n');
+
+  var meta='## 記録（'+$('aiRange').value+'日ぶん'+(part?'／'+part+'のみ':'')+'・本日は'+jpFull(today())+'）';
+  return head+'\n\n'+meta+'\n'+aiBody(list)+(note?'\n\n## 本人からの補足\n'+note:'');
+}
+function geminiFetch(path, opts){
+  var key=lsGet(AI_KEY);
+  opts=opts||{};
+  opts.headers=opts.headers||{};
+  /* キーはURLではなくヘッダーで渡す（履歴やログに残さないため） */
+  opts.headers['x-goog-api-key']=key;
+  return fetch(API_BASE+path, opts).then(function(res){
+    return res.text().then(function(txt){
+      var j={};
+      try{ j=JSON.parse(txt); }catch(e){}
+      if(!res.ok){
+        var m=(j.error && j.error.message) || txt || ('HTTP '+res.status);
+        if(res.status===400 && /API key/i.test(m)) m='APIキーが正しくないようです。'+m;
+        if(res.status===403) m='このキーではGemini APIを使えません。AI Studioでキーが有効か確認してください。\n'+m;
+        if(res.status===429) m='利用回数の上限に達しました。しばらく待つか、別のモデルを試してください。\n'+m;
+        if(res.status===404) m='そのモデルは使えません。「一覧を取得」で選び直してください。\n'+m;
+        throw new Error(m);
+      }
+      return j;
+    });
+  });
+}
+function geminiText(j){
+  if(j.promptFeedback && j.promptFeedback.blockReason)
+    throw new Error('内容が安全フィルタでブロックされました（'+j.promptFeedback.blockReason+'）。');
+  var c=j.candidates && j.candidates[0];
+  if(!c) throw new Error('回答が返りませんでした。');
+  var t=((c.content && c.content.parts) || []).map(function(p){ return p.text || ''; }).join('');
+  if(!t) throw new Error('回答が空でした（finishReason: '+(c.finishReason||'不明')+'）。別のモデルで試してください。');
+  return t;
+}
+/* 見出し・箇条書き・強調だけの最小マークダウン変換（入力は先にエスケープ済み） */
+function mdInline(s){
+  return s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+          .replace(/`([^`]+)`/g,'<code>$1</code>');
+}
+function mdToHTML(src){
+  var out=[], para=[], list=null;
+  function flushP(){ if(para.length){ out.push('<p>'+para.join('<br>')+'</p>'); para=[]; } }
+  function flushL(){ if(list){ out.push('</'+list+'>'); list=null; } }
+  esc(src).split(/\r?\n/).forEach(function(ln){
+    var t=ln.trim();
+    if(!t){ flushP(); flushL(); return; }
+    var mh=t.match(/^(#{1,4})\s+(.*)$/);
+    /* 回答の見出しは ## が主。# と ## を節見出し(h3)、それ以下を小見出し(h4)に寄せる */
+    if(mh){ flushP(); flushL(); var lv=mh[1].length<=2 ? 3 : 4;
+      out.push('<h'+lv+'>'+mdInline(mh[2])+'</h'+lv+'>'); return; }
+    var mu=t.match(/^[-*・]\s+(.*)$/);
+    if(mu){ flushP(); if(list!=='ul'){ flushL(); out.push('<ul>'); list='ul'; }
+      out.push('<li>'+mdInline(mu[1])+'</li>'); return; }
+    var mo=t.match(/^\d+[.)]\s+(.*)$/);
+    if(mo){ flushP(); if(list!=='ol'){ flushL(); out.push('<ol>'); list='ol'; }
+      out.push('<li>'+mdInline(mo[1])+'</li>'); return; }
+    flushL(); para.push(mdInline(t));
+  });
+  flushP(); flushL();
+  return out.join('');
+}
+function aiSetBusy(on, label){
+  aiBusy=on;
+  $('aiSend').disabled = on || !aiRecords().length;
+  $('aiSend').textContent = on ? '送信中…' : 'Geminiに送信して相談する';
+  if(on) $('aiOut').innerHTML='<div class="aiload"><span class="spinner"></span><span>'+esc(label||'考えています…')+'</span></div>';
+}
+function aiSend(){
+  if(aiBusy) return;
+  if(!lsGet(AI_KEY)){ alert('先にGemini APIキーを保存してください。'); $('aiKey').focus(); return; }
+  var list=aiRecords();
+  if(!list.length){ alert('送信できる記録がありません。'); return; }
+
+  if(lsGet(AI_OK)!=='1'){
+    var msg='選んだ範囲の記録（'+list.length+'件）と補足文を、GoogleのGemini APIに送信します。\n\n'
+          + '・体調に関する内容が外部サービスに送られます\n'
+          + '・返ってくる回答は診断ではありません\n\n送信してよろしいですか？';
+    if(!confirm(msg)) return;
+    lsSet(AI_OK,'1');
+  }
+  var model=$('aiModel').value;
+  lsSet(AI_MODEL, model);
+  aiSetBusy(true);
+
+  geminiFetch('models/'+encodeURIComponent(model)+':generateContent', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      contents:[{ role:'user', parts:[{ text:aiPrompt() }] }],
+      generationConfig:{ temperature:0.4 }
+    })
+  }).then(function(j){
+    var txt=geminiText(j);
+    $('aiOut').innerHTML='<div class="aiout">'+mdToHTML(txt)
+      + '<p class="src">'+esc(model)+' の回答（'+esc(jpFull(today()))+'）。'
+      + 'これは診断ではありません。気になる症状は医療機関にご相談ください。</p></div>';
+  }).catch(function(e){
+    $('aiOut').innerHTML='<div class="aierr">'+esc(e.message||String(e))
+      + '\n\n通信に失敗した場合は、オフラインでないか、キーに Generative Language API の権限があるかをご確認ください。</div>';
+  }).then(function(){ aiSetBusy(false); });
+}
+function aiLoadModels(){
+  if(!lsGet(AI_KEY)){ alert('先にGemini APIキーを保存してください。'); return; }
+  var btn=$('aiModelList'); btn.disabled=true; btn.textContent='取得中…';
+  geminiFetch('models?pageSize=200').then(function(j){
+    var names=(j.models||[]).filter(function(m){
+      return (m.supportedGenerationMethods||[]).indexOf('generateContent')>=0;
+    }).map(function(m){ return String(m.name||'').replace(/^models\//,''); })
+      .filter(function(n){ return n && !/embedding|aqa|imagen|veo|tts/i.test(n); })
+      .sort();
+    if(!names.length) throw new Error('使えるモデルが見つかりませんでした。');
+    var keep=$('aiModel').value;
+    $('aiModel').innerHTML=names.map(function(n){ return '<option>'+esc(n)+'</option>'; }).join('');
+    $('aiModel').value = names.indexOf(keep)>=0 ? keep
+      : (names.indexOf('gemini-2.5-flash')>=0 ? 'gemini-2.5-flash' : names[0]);
+    lsSet(AI_MODEL, $('aiModel').value);
+    $('aiOut').innerHTML='';
+  }).catch(function(e){
+    $('aiOut').innerHTML='<div class="aierr">'+esc(e.message||String(e))+'</div>';
+  }).then(function(){ btn.disabled=false; btn.textContent='一覧を取得'; });
+}
+function renderAI(){
+  var parts={};
+  records.forEach(function(r){ parts[r.part]=1; });
+  var keep=$('aiPart').value;
+  $('aiPart').innerHTML='<option value="">すべての部位</option>'
+    + Object.keys(parts).sort().map(function(p){ return '<option>'+esc(p)+'</option>'; }).join('');
+  $('aiPart').value=keep;
+  aiKeyState();
+  aiScope();
+}
+
 /* ---------------- render ---------------- */
 function render(){
   $('date').value=state.date;
@@ -847,6 +1145,7 @@ function render(){
   if(state.tab==='calendar') renderCalendar();
   if(state.tab==='stats') renderStats();
   if(state.tab==='compare') renderCompare();
+  if(state.tab==='ai') renderAI();
   $('saveBar').classList.toggle('hidden', state.tab!=='record');
 }
 
@@ -857,7 +1156,7 @@ $('tabs').addEventListener('click',function(e){
   Array.prototype.forEach.call(this.querySelectorAll('button'),function(x){
     x.setAttribute('aria-selected', String(x===b));
   });
-  ['record','history','calendar','stats','compare','data'].forEach(function(t){
+  ['record','history','calendar','stats','compare','ai','data'].forEach(function(t){
     $('tab-'+t).classList.toggle('hidden', t!==state.tab);
   });
   window.scrollTo(0,0);
@@ -972,6 +1271,21 @@ $('cGranSeg').addEventListener('click',function(e){
   renderCompare();
 });
 
+$('aiKeySave').onclick=function(){
+  var v=$('aiKey').value.trim();
+  if(!v){ alert('APIキーを入力してください。'); return; }
+  lsSet(AI_KEY, v); $('aiKey').value=''; aiKeyState();
+  alert('保存しました。この端末のブラウザにのみ保存されます。');
+};
+$('aiKeyClear').onclick=function(){
+  if(!lsGet(AI_KEY)){ alert('保存されているキーはありません。'); return; }
+  if(!confirm('保存したAPIキーを削除しますか？')) return;
+  lsDel(AI_KEY); lsDel(AI_OK); $('aiKey').value=''; aiKeyState();
+};
+$('aiModelList').onclick=aiLoadModels;
+$('aiSend').onclick=aiSend;
+['aiRange','aiPart'].forEach(function(id){ $(id).addEventListener('change', aiScope); });
+
 $('mPrev').onclick=function(){ state.month.setMonth(state.month.getMonth()-1); renderCalendar(); };
 $('mNext').onclick=function(){ state.month.setMonth(state.month.getMonth()+1); renderCalendar(); };
 $('cal').addEventListener('click',function(e){
@@ -1065,6 +1379,16 @@ $('wipe').onclick=function(){
   if(!confirm('本当に削除してよろしいですか？')) return;
   records=[]; persist(); resetForm(false); render();
 };
+
+/* 前回選んだモデルを復元（一覧取得で増えたモデル名も拾えるように） */
+(function(){
+  var m=lsGet(AI_MODEL);
+  if(!m) return;
+  var sel=$('aiModel'), found=false;
+  Array.prototype.forEach.call(sel.options, function(o){ if(o.value===m) found=true; });
+  if(!found) sel.appendChild(new Option(m, m));
+  sel.value=m;
+})();
 
 render();
 })();

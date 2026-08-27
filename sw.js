@@ -1,6 +1,6 @@
 /* からだ記録 — オフライン用サービスワーカー
    HTML はネットワーク優先（更新をすぐ反映）、それ以外はキャッシュ優先。 */
-var CACHE = 'karada-log-v2';
+var CACHE = 'karada-log-v3';
 var ASSETS = [
   './',
   './index.html',
