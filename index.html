@@ -173,6 +173,23 @@ svg.body .part.sel>*{stroke:var(--accent);stroke-width:2.8}
 .kpi b{display:block;font-size:21px;line-height:1.3}
 .kpi span{font-size:11px;color:var(--muted)}
 
+/* --- くらべる --- */
+.kpi .delta{display:block;font-size:12.5px;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums}
+.delta.up{color:#dd4b4b}
+.delta.down{color:#2fa37a}
+.delta.flat{color:var(--muted)}
+.drow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.drow:last-child{border-bottom:0}
+.drow .dname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drow .dcnt{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums;flex:0 0 auto}
+.dbadge{flex:0 0 auto;min-width:52px;text-align:center;font-size:12.5px;font-weight:700;
+  padding:4px 9px;border-radius:999px;border:1px solid var(--line);font-variant-numeric:tabular-nums}
+.dbadge.up{color:#dd4b4b;background:rgba(221,75,75,.10);border-color:rgba(221,75,75,.35)}
+.dbadge.down{color:#2fa37a;background:rgba(47,163,122,.10);border-color:rgba(47,163,122,.35)}
+.dbadge.flat{color:var(--muted)}
+svg.trend{width:100%;height:auto;display:block;margin-top:12px}
+svg.trend text{fill:var(--muted);font-family:inherit}
+
 .savebar{
   position:fixed;left:0;right:0;bottom:0;z-index:30;
   background:linear-gradient(to top,var(--bg) 62%,transparent);
@@ -208,6 +225,7 @@ label.fld{display:block;font-size:13px;color:var(--muted);margin:15px 0 7px;font
       <button data-tab="history" aria-selected="false">履歴</button>
       <button data-tab="calendar" aria-selected="false">カレンダー</button>
       <button data-tab="stats" aria-selected="false">統計</button>
+      <button data-tab="compare" aria-selected="false">くらべる</button>
       <button data-tab="data" aria-selected="false">データ</button>
     </nav>
   </header>
@@ -341,6 +359,45 @@ label.fld{display:block;font-size:13px;color:var(--muted);margin:15px 0 7px;font
     </div>
   </section>
 
+  <!-- ============ くらべる ============ -->
+  <section id="tab-compare" class="hidden">
+    <div class="card">
+      <h2>くらべる対象</h2>
+      <select id="cPart"><option value="">すべての部位</option></select>
+      <div class="row" style="margin-top:10px;justify-content:center">
+        <div class="seg" id="cWinSeg">
+          <button data-win="7" aria-pressed="false">7日</button>
+          <button data-win="30" aria-pressed="true">30日</button>
+          <button data-win="90" aria-pressed="false">90日</button>
+        </div>
+      </div>
+      <div class="hint" id="cRange"></div>
+    </div>
+
+    <div class="card">
+      <h2 id="cDeltaTitle">前の期間との差</h2>
+      <div class="kpis" id="cDelta"></div>
+      <div class="hint">増えていれば赤、減っていれば緑で表示します。</div>
+    </div>
+
+    <div class="card">
+      <h2>部位別の増減（全部位）</h2>
+      <div id="cPartDelta"></div>
+    </div>
+
+    <div class="card">
+      <h2 id="cTrendTitle">推移</h2>
+      <div class="row" style="justify-content:center">
+        <div class="seg" id="cGranSeg">
+          <button data-gran="week" aria-pressed="true">週ごと</button>
+          <button data-gran="month" aria-pressed="false">月ごと</button>
+        </div>
+      </div>
+      <div id="cTrend"></div>
+      <div class="hint">棒の高さが記録数、色がその期間の平均つらさです。</div>
+    </div>
+  </section>
+
   <!-- ============ データ ============ -->
   <section id="tab-data" class="hidden">
     <div class="card">
@@ -423,7 +480,8 @@ var now=new Date();
 var state={
   date: today(), view:'front', part:null, scope:'day', tab:'record',
   syms:{}, sev:3, editingId:null,
-  month:new Date(now.getFullYear(), now.getMonth(), 1)
+  month:new Date(now.getFullYear(), now.getMonth(), 1),
+  cWin:30, cGran:'week'
 };
 
 /* ---------------- helpers ---------------- */
@@ -668,6 +726,117 @@ function renderStats(){
   $('weekTrend').innerHTML=weeks.map(function(w){ return barHTML(w.label,w.v,mx,'#8fd3b6'); }).join('');
 }
 
+/* ---------------- くらべる ---------------- */
+function statsIn(part, s, e){
+  var list=records.filter(function(r){
+    if(part && r.part!==part) return false;
+    return r.date>=s && r.date<=e;
+  });
+  var days={};
+  list.forEach(function(r){ days[r.date]=1; });
+  return {
+    count:list.length,
+    days:Object.keys(days).length,
+    avg:list.length ? list.reduce(function(a,r){ return a+r.sev; },0)/list.length : 0
+  };
+}
+/* 症状は「増えたら悪化」なので、増加を赤・減少を緑で示す */
+function kpiDelta(cur, prev, label, digits){
+  var d=cur-prev, eps=digits?0.05:0.5;
+  var cls = Math.abs(d)<eps ? 'flat' : (d>0?'up':'down');
+  var sign = cls==='flat' ? '±' : (d>0?'+':'−');
+  var mag = digits ? Math.abs(cls==='flat'?0:d).toFixed(digits) : Math.abs(cls==='flat'?0:d);
+  return '<div class="kpi"><b>'+(digits?cur.toFixed(digits):cur)+'</b>'
+       + '<span>'+label+'</span>'
+       + '<span class="delta '+cls+'">'+sign+mag+'</span></div>';
+}
+/* 平均つらさは、片方の期間に記録がないと比較できない（0件の平均は0ではない） */
+function kpiAvg(cur, prev, curN, prevN, label){
+  if(curN && prevN) return kpiDelta(cur, prev, label, 1);
+  return '<div class="kpi"><b>'+(curN?cur.toFixed(1):'—')+'</b>'
+       + '<span>'+label+'</span><span class="delta flat">—</span></div>';
+}
+function bucketsFor(gran){
+  var out=[], base=new Date(); base.setHours(0,0,0,0);
+  if(gran==='month'){
+    for(var j=11;j>=0;j--){
+      var ms=new Date(base.getFullYear(), base.getMonth()-j, 1);
+      var me=new Date(ms.getFullYear(), ms.getMonth()+1, 0);
+      out.push({ s:fmt(ms), e:fmt(me), label:(ms.getMonth()+1)+'月' });
+    }
+  }else{
+    base.setDate(base.getDate()-base.getDay());
+    for(var i=11;i>=0;i--){
+      var ws=new Date(base); ws.setDate(ws.getDate()-i*7);
+      var we=new Date(ws); we.setDate(we.getDate()+6);
+      out.push({ s:fmt(ws), e:fmt(we), label:(ws.getMonth()+1)+'/'+ws.getDate() });
+    }
+  }
+  return out;
+}
+function trendSVG(part, gran){
+  var data=bucketsFor(gran).map(function(b){
+    var st=statsIn(part, b.s, b.e);
+    return { label:b.label, c:st.count, avg:st.avg };
+  });
+  var max=Math.max.apply(null, data.map(function(d){ return d.c; }));
+  if(!max) return '<div class="empty">この期間に記録がありません。</div>';
+
+  var W=360, H=150, padL=4, padR=4, padT=16, padB=26, gap=4;
+  var n=data.length, bw=(W-padL-padR-gap*(n-1))/n, plotH=H-padT-padB;
+  var out='<svg class="trend" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="期間ごとの記録数">';
+  out+='<line x1="'+padL+'" y1="'+(H-padB)+'" x2="'+(W-padR)+'" y2="'+(H-padB)+'" stroke="var(--line)" stroke-width="1"/>';
+  data.forEach(function(d,i){
+    var x=padL+i*(bw+gap), cx=(x+bw/2).toFixed(1);
+    if(d.c){
+      var h=Math.max(3, plotH*d.c/max), y=H-padB-h;
+      out+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)
+         + '" rx="3" fill="'+SEV_COLORS[Math.min(5,Math.max(1,Math.round(d.avg)))]+'"/>';
+      out+='<text x="'+cx+'" y="'+(y-4).toFixed(1)+'" font-size="9" text-anchor="middle">'+d.c+'</text>';
+    }
+    out+='<text x="'+cx+'" y="'+(H-padB+14)+'" font-size="8.5" text-anchor="middle">'+esc(d.label)+'</text>';
+  });
+  return out+'</svg>';
+}
+function renderCompare(){
+  var parts={};
+  records.forEach(function(r){ parts[r.part]=1; });
+  var keep=$('cPart').value;
+  $('cPart').innerHTML='<option value="">すべての部位</option>'
+    + Object.keys(parts).sort().map(function(p){ return '<option>'+esc(p)+'</option>'; }).join('');
+  $('cPart').value=keep;
+  var part=$('cPart').value;
+
+  var n=state.cWin;
+  var curS=daysAgo(n-1), curE=today();
+  var prevS=daysAgo(n*2-1), prevE=daysAgo(n);
+
+  var cur=statsIn(part, curS, curE), prev=statsIn(part, prevS, prevE);
+  $('cDeltaTitle').textContent='直近'+n+'日 と その前の'+n+'日';
+  $('cRange').textContent='今回：'+jpFull(curS)+' 〜 '+jpFull(curE)+'\n前回：'+jpFull(prevS)+' 〜 '+jpFull(prevE);
+  $('cRange').style.whiteSpace='pre-line';
+  $('cDelta').innerHTML = kpiDelta(cur.count, prev.count, '記録数', 0)
+                        + kpiDelta(cur.days,  prev.days,  '記録した日', 0)
+                        + kpiAvg(cur.avg, prev.avg, cur.count, prev.count, '平均つらさ');
+
+  var rows=Object.keys(parts).map(function(p){
+    var c=statsIn(p, curS, curE).count, v=statsIn(p, prevS, prevE).count;
+    return { p:p, c:c, v:v, d:c-v };
+  }).filter(function(r){ return r.c || r.v; })
+    .sort(function(a,b){ return (b.d-a.d) || (b.c-a.c); });
+
+  $('cPartDelta').innerHTML = rows.length ? rows.map(function(r){
+    var cls=r.d>0?'up':r.d<0?'down':'flat';
+    var txt=r.d>0?'+'+r.d:r.d<0?'−'+Math.abs(r.d):'±0';
+    return '<div class="drow"><span class="dname">'+esc(r.p)+'</span>'
+         + '<span class="dcnt">'+r.v+' → '+r.c+'</span>'
+         + '<span class="dbadge '+cls+'">'+txt+'</span></div>';
+  }).join('') : '<div class="empty">くらべられる記録がまだありません。<br>'+(n*2)+'日ぶんの記録がたまると差が出せます。</div>';
+
+  $('cTrendTitle').textContent='推移（'+(part||'すべての部位')+'）';
+  $('cTrend').innerHTML=trendSVG(part, state.cGran);
+}
+
 /* ---------------- render ---------------- */
 function render(){
   $('date').value=state.date;
@@ -677,6 +846,7 @@ function render(){
   if(state.tab==='history') renderHistory();
   if(state.tab==='calendar') renderCalendar();
   if(state.tab==='stats') renderStats();
+  if(state.tab==='compare') renderCompare();
   $('saveBar').classList.toggle('hidden', state.tab!=='record');
 }
 
@@ -687,7 +857,7 @@ $('tabs').addEventListener('click',function(e){
   Array.prototype.forEach.call(this.querySelectorAll('button'),function(x){
     x.setAttribute('aria-selected', String(x===b));
   });
-  ['record','history','calendar','stats','data'].forEach(function(t){
+  ['record','history','calendar','stats','compare','data'].forEach(function(t){
     $('tab-'+t).classList.toggle('hidden', t!==state.tab);
   });
   window.scrollTo(0,0);
@@ -783,6 +953,24 @@ function recAction(e){
 $('dayList').addEventListener('click',recAction);
 $('histList').addEventListener('click',recAction);
 ['fPart','fSym','fRange','fSev'].forEach(function(id){ $(id).addEventListener('change',renderHistory); });
+
+$('cPart').addEventListener('change', renderCompare);
+$('cWinSeg').addEventListener('click',function(e){
+  var b=e.target.closest('button[data-win]'); if(!b) return;
+  state.cWin=+b.getAttribute('data-win');
+  Array.prototype.forEach.call(this.querySelectorAll('button'),function(x){
+    x.setAttribute('aria-pressed', String(x===b));
+  });
+  renderCompare();
+});
+$('cGranSeg').addEventListener('click',function(e){
+  var b=e.target.closest('button[data-gran]'); if(!b) return;
+  state.cGran=b.getAttribute('data-gran');
+  Array.prototype.forEach.call(this.querySelectorAll('button'),function(x){
+    x.setAttribute('aria-pressed', String(x===b));
+  });
+  renderCompare();
+});
 
 $('mPrev').onclick=function(){ state.month.setMonth(state.month.getMonth()-1); renderCalendar(); };
 $('mNext').onclick=function(){ state.month.setMonth(state.month.getMonth()+1); renderCalendar(); };
