@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>からだ記録 — 日付×部位の不調ログ</title>
+<meta name="description" content="からだの異変を日付×部位で記録するアプリ。人体図から部位を選び、症状とつらさを残せます。">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14161a" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="からだ記録">
+<meta name="format-detection" content="telephone=no,date=no,address=no,email=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192">
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --panel-2:#f0f2f5; --line:#e2e5ea;
+  --text:#1c2026; --muted:#6b7280; --accent:#3b6ef5; --accent-soft:#e7edff;
+  --body-fill:#dfe4ec; --body-stroke:#c3cad6;
+  --radius:14px; --shadow:0 1px 2px rgba(16,24,40,.06),0 6px 18px rgba(16,24,40,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161a; --panel:#1c1f25; --panel-2:#23272e; --line:#2e333c;
+    --text:#e8eaee; --muted:#9aa3b2; --accent:#6b93ff; --accent-soft:#1e2a4d;
+    --body-fill:#333944; --body-stroke:#454c59;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25);
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Noto Sans JP",Meiryo,sans-serif;
+  font-size:16px; line-height:1.6;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-font-smoothing:antialiased;
+  overscroll-behavior-y:none;
+}
+/* iOS: 選択できると邪魔になる操作系のテキストだけ選択不可に */
+nav,.seg,.sev,.chips,.cal,.savebar,.legend{-webkit-user-select:none;user-select:none}
+.wrap{
+  max-width:760px; margin:0 auto;
+  padding-left:max(14px, env(safe-area-inset-left));
+  padding-right:max(14px, env(safe-area-inset-right));
+  padding-bottom:calc(112px + env(safe-area-inset-bottom));
+}
+header{
+  position:sticky; top:0; z-index:20; background:var(--bg);
+  padding:calc(12px + env(safe-area-inset-top)) 0 8px; border-bottom:1px solid var(--line);
+}
+.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+h1{font-size:19px;margin:0;letter-spacing:.02em}
+.brand small{color:var(--muted);font-size:12px}
+nav{display:flex;gap:6px;margin-top:10px;overflow-x:auto;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav{-webkit-overflow-scrolling:touch}
+nav button{
+  flex:0 0 auto; border:1px solid var(--line); background:var(--panel); color:var(--muted);
+  padding:8px 15px; border-radius:999px; font-size:14.5px; cursor:pointer; font-family:inherit;
+  transition:.15s; min-height:40px;
+}
+nav button:hover{color:var(--text)}
+nav button[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-top:12px;box-shadow:var(--shadow)}
+.card h2{font-size:13px;margin:0 0 10px;color:var(--muted);font-weight:600;letter-spacing:.05em}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+/* iOS はフォント16px未満の入力にフォーカスすると自動ズームするため、16pxを下回らせない */
+input,select,textarea,button{font-family:inherit;font-size:16px;color:var(--text)}
+input[type=date],select,textarea,input[type=text]{
+  background:var(--panel-2); border:1px solid var(--line); border-radius:10px;
+  padding:11px; width:100%; min-height:46px; -webkit-appearance:none; appearance:none;
+}
+select{background-image:none}
+input[type=date]{text-align:left}
+textarea{resize:vertical;min-height:84px;line-height:1.55;-webkit-appearance:none}
+.btn{
+  border:1px solid var(--line); background:var(--panel-2); color:var(--text);
+  padding:11px 16px;border-radius:10px;cursor:pointer;font-size:15px;transition:.15s;
+  min-height:46px;-webkit-appearance:none;appearance:none
+}
+.btn:hover{border-color:var(--accent)}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.primary:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary:disabled:active{transform:none}
+.btn.ghost{background:transparent}
+.btn.sm{padding:8px 14px;font-size:13.5px;border-radius:9px;min-height:40px}
+.btn.danger{color:#dd4b4b}
+.iconbtn{width:46px;height:46px;display:grid;place-items:center;padding:0;font-size:19px;flex:0 0 auto}
+
+/* --- body map --- */
+.mapwrap{display:flex;flex-direction:column;align-items:center;gap:10px}
+.seg{display:inline-flex;background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:3px;gap:2px}
+.seg button{border:0;background:transparent;color:var(--muted);padding:8px 16px;border-radius:999px;font-size:14px;cursor:pointer;font-family:inherit;min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--text);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+svg.body{width:100%;max-width:300px;height:auto;touch-action:manipulation;display:block}
+svg.body .part>*{fill:var(--body-fill);stroke:var(--body-stroke);stroke-width:1.2;cursor:pointer;transition:fill .15s,stroke .15s}
+svg.body .part:hover>*{stroke:var(--accent);stroke-width:2}
+svg.body .part.sel>*{stroke:var(--accent);stroke-width:2.8}
+.legend{display:flex;gap:10px;align-items:center;font-size:11.5px;color:var(--muted);flex-wrap:wrap;justify-content:center}
+.dot{width:11px;height:11px;border-radius:50%;display:inline-block;vertical-align:-1px;margin-right:3px}
+
+/* --- chips --- */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips{gap:7px}
+.chip{
+  border:1px solid var(--line); background:var(--panel-2); color:var(--text);
+  padding:9px 14px; border-radius:999px; font-size:14.5px; cursor:pointer; font-family:inherit;
+  transition:.12s; min-height:42px
+}
+.chip:active{transform:scale(.97)}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+@media (prefers-color-scheme: dark){ .chip[aria-pressed="true"]{color:#cfdcff} }
+
+/* --- severity --- */
+.sev{display:flex;gap:6px}
+.sev button{
+  flex:1;border:1px solid var(--line);background:var(--panel-2);border-radius:11px;padding:9px 2px;
+  cursor:pointer;font-family:inherit;color:var(--muted);transition:.12s;text-align:center;min-height:56px;
+  -webkit-appearance:none;appearance:none
+}
+.sev button:active{transform:scale(.97)}
+.sev button[aria-pressed="true"]{color:#20242b;font-weight:700;border-color:transparent}
+.sev button b{display:block;font-size:17px;line-height:1.25}
+.sev button span{font-size:10.5px;opacity:.9;letter-spacing:-.02em}
+
+/* --- records --- */
+.rec{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--panel-2);margin-top:8px}
+.rec .top{display:flex;align-items:center;gap:9px}
+.rec .pin{width:8px;height:34px;border-radius:4px;flex:0 0 auto}
+.rec .name{font-weight:600;font-size:15.5px}
+.rec .meta{color:var(--muted);font-size:12.5px}
+.rec .tags{margin-top:8px;display:flex;flex-wrap:wrap;gap:5px}
+.tag{font-size:12.5px;background:var(--panel);border:1px solid var(--line);padding:3px 9px;border-radius:999px;color:var(--muted)}
+.rec .memo{margin-top:8px;font-size:14.5px;white-space:pre-wrap}
+.rec .acts{display:flex;gap:6px;margin-left:auto}
+.empty{color:var(--muted);font-size:14px;text-align:center;padding:24px 8px;line-height:1.75}
+.daygroup h3{font-size:13px;margin:0 0 2px;color:var(--accent);font-weight:700;letter-spacing:.03em}
+
+/* --- calendar --- */
+.calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.calhead .m{font-weight:700;font-size:16px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal .wd{text-align:center;font-size:12px;color:var(--muted);padding-bottom:3px}
+.cal .wd.sun{color:#e0605f}.cal .wd.sat{color:#5b8fd6}
+.cell{aspect-ratio:1/1;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;font-size:13.5px;transition:.12s;padding:2px}
+.cell:hover{border-color:var(--accent)}
+.cell:active{transform:scale(.95)}
+.cell.blank{border:0;background:transparent;cursor:default}
+.cell.blank:active{transform:none}
+.cell.today{outline:2px solid var(--accent);outline-offset:-2px}
+.cell .n{color:var(--muted)}
+.cell.has .n{color:var(--text);font-weight:700}
+.cell .dots{display:flex;gap:2.5px;min-height:6px}
+.cell .dots i{width:6px;height:6px;border-radius:50%;display:block}
+
+/* --- stats --- */
+.bar{display:flex;align-items:center;gap:8px;margin-top:7px;font-size:13.5px}
+.bar .lbl{width:38%;flex:0 0 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar .track{flex:1;height:9px;background:var(--panel-2);border-radius:5px;overflow:hidden;border:1px solid var(--line)}
+.bar .fill{height:100%;border-radius:5px;min-width:2px}
+.bar .num{width:34px;text-align:right;color:var(--muted);font-size:12px;flex:0 0 auto}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpi{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.kpi b{display:block;font-size:21px;line-height:1.3}
+.kpi span{font-size:11px;color:var(--muted)}
+
+.savebar{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;
+  background:linear-gradient(to top,var(--bg) 62%,transparent);
+  padding-top:16px;
+  padding-left:max(14px, env(safe-area-inset-left));
+  padding-right:max(14px, env(safe-area-inset-right));
+  padding-bottom:calc(14px + env(safe-area-inset-bottom));
+}
+.savebar .inner{max-width:760px;margin:0 auto;display:flex;gap:8px}
+.savebar .btn{flex:1;padding:15px;min-height:52px;font-size:16px;border-radius:12px}
+.savebar .btn.ghost{flex:0 0 auto;padding:15px 18px}
+.hidden{display:none!important}
+.hint{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.65}
+label.fld{display:block;font-size:13px;color:var(--muted);margin:15px 0 7px;font-weight:600}
+.bar{font-size:14px}
+/* 指の届きやすさ優先：ホバー非対応（タッチ）端末では hover 装飾を無効化 */
+@media (hover:none){
+  .btn:not(.primary):hover,.chip:not([aria-pressed="true"]):hover,.cell:hover{border-color:var(--line)}
+  svg.body .part:hover>*{stroke:var(--body-stroke);stroke-width:1.2}
+  svg.body .part.sel>*{stroke:var(--accent);stroke-width:2.8}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>からだ記録</h1>
+      <small id="brandSub"></small>
+    </div>
+    <nav id="tabs">
+      <button data-tab="record" aria-selected="true">記録する</button>
+      <button data-tab="history" aria-selected="false">履歴</button>
+      <button data-tab="calendar" aria-selected="false">カレンダー</button>
+      <button data-tab="stats" aria-selected="false">統計</button>
+      <button data-tab="data" aria-selected="false">データ</button>
+    </nav>
+  </header>
+
+  <!-- ============ 記録 ============ -->
+  <section id="tab-record">
+    <div class="card">
+      <div class="row">
+        <button class="btn iconbtn" id="dPrev" title="前の日">‹</button>
+        <input type="date" id="date" style="flex:1;min-width:140px;width:auto">
+        <button class="btn iconbtn" id="dNext" title="次の日">›</button>
+        <button class="btn sm" id="dToday">今日</button>
+      </div>
+      <div class="hint" id="dateLabel"></div>
+    </div>
+
+    <div class="card">
+      <h2>部位を選ぶ</h2>
+      <div class="mapwrap">
+        <div class="seg" id="viewSeg">
+          <button data-view="front" aria-pressed="true">前面</button>
+          <button data-view="back" aria-pressed="false">背面</button>
+        </div>
+        <svg class="body" id="bodySvg" viewBox="0 0 220 390" aria-label="人体図"></svg>
+        <div class="seg" id="scopeSeg">
+          <button data-scope="day" aria-pressed="true">この日</button>
+          <button data-scope="30" aria-pressed="false">直近30日</button>
+          <button data-scope="all" aria-pressed="false">すべて</button>
+        </div>
+        <div class="legend">
+          <span>色 = つらさ</span>
+          <span><i class="dot" style="background:#8fd3b6"></i>1</span>
+          <span><i class="dot" style="background:#f2d06b"></i>2</span>
+          <span><i class="dot" style="background:#f0a35e"></i>3</span>
+          <span><i class="dot" style="background:#e8794f"></i>4</span>
+          <span><i class="dot" style="background:#dd4b4b"></i>5</span>
+        </div>
+      </div>
+      <label class="fld">図にない部位・全身のこと</label>
+      <div class="chips" id="otherParts"></div>
+    </div>
+
+    <div class="card" id="formCard">
+      <h2 id="formTitle">記録の内容</h2>
+      <div class="row" style="gap:8px">
+        <strong id="selPart" style="font-size:16px"></strong>
+        <span class="spacer"></span>
+        <button class="btn sm ghost hidden" id="clearPart">選び直す</button>
+      </div>
+
+      <label class="fld">症状（複数選択できます）</label>
+      <div class="chips" id="symChips"></div>
+      <input type="text" id="symFree" placeholder="自由入力（例：立ち上がるとズキッとする）" style="margin-top:8px">
+
+      <label class="fld">つらさ</label>
+      <div class="sev" id="sevBtns"></div>
+
+      <label class="fld">メモ（きっかけ・時間帯・対処など）</label>
+      <textarea id="memo" placeholder="例）朝起きた直後から。デスクワーク後に悪化。湿布で少し楽になった。"></textarea>
+    </div>
+
+    <div class="card">
+      <h2 id="dayListTitle">この日の記録</h2>
+      <div id="dayList"></div>
+    </div>
+  </section>
+
+  <!-- ============ 履歴 ============ -->
+  <section id="tab-history" class="hidden">
+    <div class="card">
+      <h2>絞り込み</h2>
+      <div class="row">
+        <select id="fPart" style="flex:1;min-width:140px;width:auto"><option value="">すべての部位</option></select>
+        <select id="fSym" style="flex:1;min-width:140px;width:auto"><option value="">すべての症状</option></select>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <select id="fRange" style="flex:1;min-width:140px;width:auto">
+          <option value="all">全期間</option>
+          <option value="7">直近7日</option>
+          <option value="30">直近30日</option>
+          <option value="90">直近90日</option>
+          <option value="365">直近1年</option>
+        </select>
+        <select id="fSev" style="flex:1;min-width:140px;width:auto">
+          <option value="0">つらさ問わず</option>
+          <option value="3">つらさ3以上</option>
+          <option value="4">つらさ4以上</option>
+          <option value="5">つらさ5のみ</option>
+        </select>
+      </div>
+      <div class="hint" id="histCount"></div>
+    </div>
+    <div id="histList"></div>
+  </section>
+
+  <!-- ============ カレンダー ============ -->
+  <section id="tab-calendar" class="hidden">
+    <div class="card">
+      <div class="calhead">
+        <button class="btn iconbtn" id="mPrev">‹</button>
+        <div class="m" id="mLabel"></div>
+        <button class="btn iconbtn" id="mNext">›</button>
+      </div>
+      <div class="cal" id="cal"></div>
+      <div class="hint">日付をタップすると、その日の記録画面へ移動します。</div>
+    </div>
+    <div class="card">
+      <h2>この月のまとめ</h2>
+      <div id="monthSummary"></div>
+    </div>
+  </section>
+
+  <!-- ============ 統計 ============ -->
+  <section id="tab-stats" class="hidden">
+    <div class="card">
+      <h2>ぜんたい</h2>
+      <div class="kpis" id="kpis"></div>
+      <div class="hint" id="statRange"></div>
+    </div>
+    <div class="card">
+      <h2>部位ランキング</h2>
+      <div id="partRank"></div>
+    </div>
+    <div class="card">
+      <h2>症状ランキング</h2>
+      <div id="symRank"></div>
+    </div>
+    <div class="card">
+      <h2>直近12週の記録数</h2>
+      <div id="weekTrend"></div>
+    </div>
+  </section>
+
+  <!-- ============ データ ============ -->
+  <section id="tab-data" class="hidden">
+    <div class="card">
+      <h2>バックアップ</h2>
+      <p class="hint" style="margin-top:0">記録はこの端末のブラウザ内（localStorage）にだけ保存されます。どこにも送信されません。端末の買い替えやブラウザデータの削除に備えて、ときどき書き出しておくと安心です。</p>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="expJson">JSONで書き出し</button>
+        <button class="btn" id="expCsv">CSVで書き出し</button>
+        <button class="btn" id="impBtn">JSONを読み込み</button>
+        <input type="file" id="impFile" accept="application/json,.json" class="hidden">
+      </div>
+    </div>
+    <div class="card">
+      <h2>受診メモ用テキスト</h2>
+      <p class="hint" style="margin-top:0">直近30日の記録を、医師に見せやすい形に整えます。</p>
+      <textarea id="doctorText" readonly style="min-height:200px;margin-top:8px;font-size:13px" placeholder="「生成する」を押すとここに表示されます"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn primary" id="mkDoctor">生成する</button>
+        <button class="btn" id="copyDoctor">コピー</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>取り扱い注意</h2>
+      <button class="btn danger" id="wipe">すべての記録を削除</button>
+      <p class="hint">このアプリは体調の記録用で、診断や治療の判断をするものではありません。強い症状や急な変化があるときは医療機関にご相談ください。</p>
+    </div>
+  </section>
+</div>
+
+<div class="savebar" id="saveBar">
+  <div class="inner">
+    <button class="btn ghost hidden" id="cancelEdit">キャンセル</button>
+    <button class="btn primary" id="saveBtn" disabled>この内容で記録する</button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------------- constants ---------------- */
+var KEY='karada-log-v1';
+var SEV_COLORS=['','#8fd3b6','#f2d06b','#f0a35e','#e8794f','#dd4b4b'];
+var SEV_LABELS=['','ごく軽い','軽い','ふつう','強い','とても強い'];
+
+var FRONT=[
+ {n:'頭',t:'e',x:110,y:36,rx:23,ry:27},
+ {n:'首',t:'r',x:100,y:59,w:20,h:18,r:6},
+ {n:'右肩',t:'e',x:76,y:87,rx:17,ry:13},
+ {n:'左肩',t:'e',x:144,y:87,rx:17,ry:13},
+ {n:'右上腕',t:'r',x:57,y:94,w:20,h:56,r:9},
+ {n:'左上腕',t:'r',x:143,y:94,w:20,h:56,r:9},
+ {n:'右ひじ',t:'e',x:67,y:158,rx:11,ry:9},
+ {n:'左ひじ',t:'e',x:153,y:158,rx:11,ry:9},
+ {n:'右前腕',t:'r',x:58,y:168,w:19,h:44,r:9},
+ {n:'左前腕',t:'r',x:143,y:168,w:19,h:44,r:9},
+ {n:'右手',t:'e',x:67,y:224,rx:11,ry:13},
+ {n:'左手',t:'e',x:153,y:224,rx:11,ry:13},
+ {n:'胸',t:'r',x:84,y:76,w:52,h:46,r:12},
+ {n:'お腹',t:'r',x:84,y:124,w:52,h:46,r:12},
+ {n:'骨盤・股関節',t:'r',x:84,y:172,w:52,h:30,r:12},
+ {n:'右太もも',t:'r',x:85,y:204,w:23,h:72,r:11},
+ {n:'左太もも',t:'r',x:112,y:204,w:23,h:72,r:11},
+ {n:'右ひざ',t:'e',x:96.5,y:284,rx:12,ry:10},
+ {n:'左ひざ',t:'e',x:123.5,y:284,rx:12,ry:10},
+ {n:'右すね',t:'r',x:87,y:294,w:19,h:62,r:9},
+ {n:'左すね',t:'r',x:114,y:294,w:19,h:62,r:9},
+ {n:'右足',t:'e',x:96,y:366,rx:13,ry:11},
+ {n:'左足',t:'e',x:123,y:366,rx:13,ry:11}
+];
+var BACK_NAMES=['後頭部','首の後ろ','左肩・肩甲骨','右肩・肩甲骨','左上腕（裏）','右上腕（裏）','左ひじ','右ひじ','左前腕（裏）','右前腕（裏）','左手','右手','背中（上）','背中（下）・腰','お尻','左もも裏','右もも裏','左ひざ裏','右ひざ裏','左ふくらはぎ','右ふくらはぎ','左かかと','右かかと'];
+var BACK=FRONT.map(function(p,i){ var q={}; for(var k in p) q[k]=p[k]; q.n=BACK_NAMES[i]; return q; });
+
+var OTHER_PARTS=['目','耳','鼻','口・歯','のど','髪・頭皮','顔','動悸・胸の奥','胃','腸・お通じ','皮膚（全身）','関節（全身）','気分・メンタル','睡眠','全身・発熱','その他'];
+var SYMPTOMS=['痛み','ズキズキ','鈍い痛み','かゆみ','しびれ','はれ・むくみ','発疹・赤み','こわばり','熱っぽい','だるさ','出血','めまい','吐き気','せき','違和感'];
+
+/* ---------------- state ---------------- */
+var records=load();
+var now=new Date();
+var state={
+  date: today(), view:'front', part:null, scope:'day', tab:'record',
+  syms:{}, sev:3, editingId:null,
+  month:new Date(now.getFullYear(), now.getMonth(), 1)
+};
+
+/* ---------------- helpers ---------------- */
+function $(id){ return document.getElementById(id); }
+function load(){
+  try{
+    var raw=localStorage.getItem(KEY);
+    if(!raw) return [];
+    var a=JSON.parse(raw);
+    return Array.isArray(a)?a:[];
+  }catch(e){ return []; }
+}
+function persist(){
+  try{ localStorage.setItem(KEY, JSON.stringify(records)); }
+  catch(e){ alert('保存できませんでした。ブラウザの空き容量やプライベートモードの設定をご確認ください。'); }
+}
+function pad(n){ return (n<10?'0':'')+n; }
+function fmt(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function today(){ return fmt(new Date()); }
+function parseDate(s){ var p=String(s).split('-'); return new Date(+p[0], +p[1]-1, +p[2]); }
+function shiftDate(s,n){ var d=parseDate(s); d.setDate(d.getDate()+n); return fmt(d); }
+function jpShort(s){
+  var d=parseDate(s), w=['日','月','火','水','木','金','土'][d.getDay()];
+  return (d.getMonth()+1)+'月'+d.getDate()+'日（'+w+'）';
+}
+function jpFull(s){ return parseDate(s).getFullYear()+'年'+jpShort(s); }
+function daysAgo(n){ var d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-n); return fmt(d); }
+function esc(s){
+  return String(s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function byId(id){ for(var i=0;i<records.length;i++){ if(records[i].id===id) return records[i]; } return null; }
+
+/* ---------------- body map ---------------- */
+function partsFor(v){ return v==='front'?FRONT:BACK; }
+function scopeRecords(){
+  if(state.scope==='day') return records.filter(function(r){ return r.date===state.date; });
+  if(state.scope==='30'){ var lim=daysAgo(29); return records.filter(function(r){ return r.date>=lim; }); }
+  return records;
+}
+function severityMap(){
+  var m={};
+  scopeRecords().forEach(function(r){ if(!m[r.part] || r.sev>m[r.part]) m[r.part]=r.sev; });
+  return m;
+}
+function renderBody(){
+  var sm=severityMap();
+  $('bodySvg').innerHTML=partsFor(state.view).map(function(p){
+    var sev=sm[p.n]||0;
+    var style=sev?' style="fill:'+SEV_COLORS[sev]+'"':'';
+    var shape = p.t==='e'
+      ? '<ellipse cx="'+p.x+'" cy="'+p.y+'" rx="'+p.rx+'" ry="'+p.ry+'"'+style+'/>'
+      : '<rect x="'+p.x+'" y="'+p.y+'" width="'+p.w+'" height="'+p.h+'" rx="'+p.r+'"'+style+'/>';
+    return '<g class="part'+(state.part===p.n?' sel':'')+'" data-part="'+esc(p.n)+'">'
+         + '<title>'+esc(p.n)+(sev?'（つらさ'+sev+'）':'')+'</title>'+shape+'</g>';
+  }).join('');
+}
+
+/* ---------------- form ---------------- */
+function renderChips(){
+  var sm=severityMap();
+  $('otherParts').innerHTML=OTHER_PARTS.map(function(n){
+    var sev=sm[n]||0;
+    var st=sev?' style="box-shadow:inset 4px 0 0 '+SEV_COLORS[sev]+'"':'';
+    return '<button class="chip" data-part="'+esc(n)+'" aria-pressed="'+(state.part===n)+'"'+st+'>'+esc(n)+'</button>';
+  }).join('');
+  $('symChips').innerHTML=SYMPTOMS.map(function(s){
+    return '<button class="chip" data-sym="'+esc(s)+'" aria-pressed="'+(!!state.syms[s])+'">'+esc(s)+'</button>';
+  }).join('');
+  $('sevBtns').innerHTML=[1,2,3,4,5].map(function(i){
+    var on=state.sev===i;
+    return '<button data-sev="'+i+'" aria-pressed="'+on+'"'+(on?' style="background:'+SEV_COLORS[i]+'"':'')+'>'
+         + '<b>'+i+'</b><span>'+SEV_LABELS[i]+'</span></button>';
+  }).join('');
+}
+function renderForm(){
+  var sp=$('selPart');
+  sp.textContent = state.part || '部位が選ばれていません';
+  sp.style.color = state.part ? 'var(--text)' : 'var(--muted)';
+  $('clearPart').classList.toggle('hidden', !state.part);
+  $('saveBtn').disabled = !state.part;
+  $('saveBtn').textContent = state.editingId ? 'この内容に更新する' : 'この内容で記録する';
+  $('formTitle').textContent = state.editingId ? '記録を編集中' : '記録の内容';
+  $('cancelEdit').classList.toggle('hidden', !state.editingId);
+}
+function resetForm(keepPart){
+  state.syms={}; state.sev=3; state.editingId=null;
+  $('memo').value=''; $('symFree').value='';
+  if(!keepPart) state.part=null;
+}
+
+/* ---------------- record cards ---------------- */
+function recHTML(r){
+  var tags=(r.syms||[]).map(function(s){ return '<span class="tag">'+esc(s)+'</span>'; }).join('');
+  return '<div class="rec" data-id="'+esc(r.id)+'">'
+    + '<div class="top">'
+      + '<span class="pin" style="background:'+SEV_COLORS[r.sev]+'"></span>'
+      + '<div><div class="name">'+esc(r.part)+'</div>'
+      + '<div class="meta">つらさ '+r.sev+'／'+SEV_LABELS[r.sev]+'</div></div>'
+      + '<div class="acts"><button class="btn sm" data-act="edit">編集</button>'
+      + '<button class="btn sm danger" data-act="del">削除</button></div>'
+    + '</div>'
+    + (tags?'<div class="tags">'+tags+'</div>':'')
+    + (r.memo?'<div class="memo">'+esc(r.memo)+'</div>':'')
+  + '</div>';
+}
+function renderDayList(){
+  var list=records.filter(function(r){ return r.date===state.date; })
+                  .sort(function(a,b){ return (a.createdAt||0)-(b.createdAt||0); });
+  $('dayListTitle').textContent=jpShort(state.date)+'の記録（'+list.length+'件）';
+  $('dayList').innerHTML = list.length ? list.map(recHTML).join('')
+    : '<div class="empty">この日の記録はまだありません。<br>人体図から部位を選んで記録できます。</div>';
+}
+
+/* ---------------- history ---------------- */
+function fillFilters(){
+  var parts={}, syms={};
+  records.forEach(function(r){
+    parts[r.part]=1;
+    (r.syms||[]).forEach(function(s){ syms[s]=1; });
+  });
+  var pv=$('fPart').value, sv=$('fSym').value;
+  $('fPart').innerHTML='<option value="">すべての部位</option>'+Object.keys(parts).sort().map(function(p){ return '<option>'+esc(p)+'</option>'; }).join('');
+  $('fSym').innerHTML='<option value="">すべての症状</option>'+Object.keys(syms).sort().map(function(p){ return '<option>'+esc(p)+'</option>'; }).join('');
+  $('fPart').value=pv; $('fSym').value=sv;
+}
+function renderHistory(){
+  fillFilters();
+  var p=$('fPart').value, s=$('fSym').value, rg=$('fRange').value, mv=+$('fSev').value;
+  var list=records.filter(function(r){
+    if(p && r.part!==p) return false;
+    if(s && (r.syms||[]).indexOf(s)<0) return false;
+    if(mv && r.sev<mv) return false;
+    if(rg!=='all' && r.date < daysAgo(+rg-1)) return false;
+    return true;
+  }).sort(function(a,b){
+    if(a.date!==b.date) return a.date<b.date?1:-1;
+    return (b.createdAt||0)-(a.createdAt||0);
+  });
+
+  $('histCount').textContent=list.length+'件が該当（全'+records.length+'件）';
+  if(!list.length){
+    $('histList').innerHTML='<div class="card"><div class="empty">条件に合う記録はありません。</div></div>';
+    return;
+  }
+  var byDate={}, order=[];
+  list.forEach(function(r){
+    if(!byDate[r.date]){ byDate[r.date]=[]; order.push(r.date); }
+    byDate[r.date].push(r);
+  });
+  $('histList').innerHTML=order.map(function(d){
+    return '<div class="card daygroup"><h3>'+esc(jpFull(d))+'</h3>'+byDate[d].map(recHTML).join('')+'</div>';
+  }).join('');
+}
+
+/* ---------------- calendar ---------------- */
+function kpi(v,l){ return '<div class="kpi"><b>'+v+'</b><span>'+l+'</span></div>'; }
+function barHTML(label,val,max,color){
+  var pct=max?Math.round(val/max*100):0;
+  return '<div class="bar"><span class="lbl">'+esc(label)+'</span>'
+    + '<span class="track"><span class="fill" style="width:'+pct+'%;background:'+color+'"></span></span>'
+    + '<span class="num">'+val+'</span></div>';
+}
+function renderCalendar(){
+  var y=state.month.getFullYear(), m=state.month.getMonth();
+  $('mLabel').textContent=y+'年'+(m+1)+'月';
+  var lead=new Date(y,m,1).getDay(), last=new Date(y,m+1,0).getDate();
+  var byDay={};
+  records.forEach(function(r){
+    var d=parseDate(r.date);
+    if(d.getFullYear()===y && d.getMonth()===m){
+      if(!byDay[d.getDate()]) byDay[d.getDate()]=[];
+      byDay[d.getDate()].push(r);
+    }
+  });
+  var html=['日','月','火','水','木','金','土'].map(function(w,i){
+    return '<div class="wd'+(i===0?' sun':i===6?' sat':'')+'">'+w+'</div>';
+  }).join('');
+  for(var i=0;i<lead;i++) html+='<div class="cell blank"></div>';
+  var tdy=today();
+  for(var d=1; d<=last; d++){
+    var ds=fmt(new Date(y,m,d)), rs=byDay[d]||[];
+    var dots=rs.slice(0,4).map(function(r){ return '<i style="background:'+SEV_COLORS[r.sev]+'"></i>'; }).join('');
+    html+='<div class="cell'+(rs.length?' has':'')+(ds===tdy?' today':'')+'" data-date="'+ds+'">'
+        + '<span class="n">'+d+'</span><span class="dots">'+dots+'</span>'
+        + (rs.length>4?'<span style="font-size:9px;color:var(--muted)">+'+(rs.length-4)+'</span>':'')
+        + '</div>';
+  }
+  $('cal').innerHTML=html;
+
+  var all=[];
+  Object.keys(byDay).forEach(function(k){ all=all.concat(byDay[k]); });
+  if(!all.length){ $('monthSummary').innerHTML='<div class="empty">この月の記録はありません。</div>'; return; }
+  var cnt={};
+  all.forEach(function(r){ cnt[r.part]=(cnt[r.part]||0)+1; });
+  var top=Object.keys(cnt).sort(function(a,b){ return cnt[b]-cnt[a]; }).slice(0,5);
+  var avg=(all.reduce(function(a,r){ return a+r.sev; },0)/all.length).toFixed(1);
+  $('monthSummary').innerHTML='<div class="kpis" style="margin-bottom:12px">'
+    + kpi(all.length,'記録数') + kpi(Object.keys(byDay).length,'記録した日') + kpi(avg,'平均つらさ')
+    + '</div>' + top.map(function(p){ return barHTML(p,cnt[p],cnt[top[0]],'var(--accent)'); }).join('');
+}
+
+/* ---------------- stats ---------------- */
+function rank(obj,n,color){
+  var ks=Object.keys(obj).sort(function(a,b){ return obj[b]-obj[a]; }).slice(0,n);
+  return ks.map(function(k){ return barHTML(k,obj[k],obj[ks[0]],color); }).join('');
+}
+function renderStats(){
+  if(!records.length){
+    $('kpis').innerHTML=''; $('statRange').textContent='';
+    $('partRank').innerHTML='<div class="empty">記録がまだありません。</div>';
+    $('symRank').innerHTML=''; $('weekTrend').innerHTML='';
+    return;
+  }
+  var days={};
+  records.forEach(function(r){ days[r.date]=1; });
+  var avg=(records.reduce(function(a,r){ return a+r.sev; },0)/records.length).toFixed(1);
+  var dates=records.map(function(r){ return r.date; }).sort();
+  $('kpis').innerHTML=kpi(records.length,'総記録数')+kpi(Object.keys(days).length,'記録した日数')+kpi(avg,'平均つらさ');
+  $('statRange').textContent='最初の記録：'+jpFull(dates[0])+' ／ 最新：'+jpFull(dates[dates.length-1]);
+
+  var pc={}, sc={};
+  records.forEach(function(r){
+    pc[r.part]=(pc[r.part]||0)+1;
+    (r.syms||[]).forEach(function(s){ sc[s]=(sc[s]||0)+1; });
+  });
+  $('partRank').innerHTML=rank(pc,10,'var(--accent)');
+  $('symRank').innerHTML=Object.keys(sc).length?rank(sc,10,'#f0a35e'):'<div class="empty">症状タグの記録がありません。</div>';
+
+  var base=new Date(); base.setHours(0,0,0,0); base.setDate(base.getDate()-base.getDay());
+  var weeks=[];
+  for(var i=11;i>=0;i--){
+    var s=new Date(base); s.setDate(s.getDate()-i*7);
+    var e=new Date(s); e.setDate(e.getDate()+6);
+    var ss=fmt(s), es=fmt(e);
+    weeks.push({ label:(s.getMonth()+1)+'/'+s.getDate()+'の週',
+                 v:records.filter(function(r){ return r.date>=ss && r.date<=es; }).length });
+  }
+  var mx=Math.max.apply(null, weeks.map(function(w){ return w.v; }))||1;
+  $('weekTrend').innerHTML=weeks.map(function(w){ return barHTML(w.label,w.v,mx,'#8fd3b6'); }).join('');
+}
+
+/* ---------------- render ---------------- */
+function render(){
+  $('date').value=state.date;
+  $('dateLabel').textContent=jpFull(state.date)+(state.date===today()?'（今日）':'');
+  $('brandSub').textContent='記録 '+records.length+'件';
+  renderBody(); renderChips(); renderForm(); renderDayList();
+  if(state.tab==='history') renderHistory();
+  if(state.tab==='calendar') renderCalendar();
+  if(state.tab==='stats') renderStats();
+  $('saveBar').classList.toggle('hidden', state.tab!=='record');
+}
+
+/* ---------------- events ---------------- */
+$('tabs').addEventListener('click',function(e){
+  var b=e.target.closest('button[data-tab]'); if(!b) return;
+  state.tab=b.getAttribute('data-tab');
+  Array.prototype.forEach.call(this.querySelectorAll('button'),function(x){
+    x.setAttribute('aria-selected', String(x===b));
+  });
+  ['record','history','calendar','stats','data'].forEach(function(t){
+    $('tab-'+t).classList.toggle('hidden', t!==state.tab);
+  });
+  window.scrollTo(0,0);
+  render();
+});
+$('date').addEventListener('change',function(){ state.date=this.value||today(); render(); });
+$('dPrev').onclick=function(){ state.date=shiftDate(state.date,-1); render(); };
+$('dNext').onclick=function(){ state.date=shiftDate(state.date, 1); render(); };
+$('dToday').onclick=function(){ state.date=today(); render(); };
+
+$('viewSeg').addEventListener('click',function(e){
+  var b=e.target.closest('button[data-view]'); if(!b) return;
+  state.view=b.getAttribute('data-view');
+  Array.prototype.forEach.call(this.querySelectorAll('button'),function(x){
+    x.setAttribute('aria-pressed', String(x===b));
+  });
+  renderBody();
+});
+$('scopeSeg').addEventListener('click',function(e){
+  var b=e.target.closest('button[data-scope]'); if(!b) return;
+  state.scope=b.getAttribute('data-scope');
+  Array.prototype.forEach.call(this.querySelectorAll('button'),function(x){
+    x.setAttribute('aria-pressed', String(x===b));
+  });
+  renderBody(); renderChips();
+});
+function pickPart(name){
+  state.part=(state.part===name)?null:name;
+  renderBody(); renderChips(); renderForm();
+}
+$('bodySvg').addEventListener('click',function(e){
+  var g=e.target.closest('.part'); if(!g) return;
+  pickPart(g.getAttribute('data-part'));
+});
+$('otherParts').addEventListener('click',function(e){
+  var b=e.target.closest('button[data-part]'); if(!b) return;
+  pickPart(b.getAttribute('data-part'));
+});
+$('symChips').addEventListener('click',function(e){
+  var b=e.target.closest('button[data-sym]'); if(!b) return;
+  var s=b.getAttribute('data-sym');
+  if(state.syms[s]) delete state.syms[s]; else state.syms[s]=1;
+  b.setAttribute('aria-pressed', String(!!state.syms[s]));
+});
+$('sevBtns').addEventListener('click',function(e){
+  var b=e.target.closest('button[data-sev]'); if(!b) return;
+  state.sev=+b.getAttribute('data-sev'); renderChips();
+});
+$('clearPart').onclick=function(){ state.part=null; renderBody(); renderChips(); renderForm(); };
+$('cancelEdit').onclick=function(){ resetForm(false); renderBody(); renderChips(); renderForm(); };
+
+$('saveBtn').onclick=function(){
+  if(!state.part) return;
+  var syms=Object.keys(state.syms);
+  var free=$('symFree').value.trim();
+  if(free){
+    free.split(/[、,]/).forEach(function(s){
+      s=s.trim();
+      if(s && syms.indexOf(s)<0) syms.push(s);
+    });
+  }
+  var memo=$('memo').value.trim();
+  if(state.editingId){
+    var r=byId(state.editingId);
+    if(r){ r.date=state.date; r.part=state.part; r.syms=syms; r.sev=state.sev; r.memo=memo; }
+  }else{
+    records.push({ id:uid(), date:state.date, part:state.part, syms:syms, sev:state.sev, memo:memo, createdAt:Date.now() });
+  }
+  persist(); resetForm(true); render();
+  $('dayList').scrollIntoView({behavior:'smooth', block:'nearest'});
+};
+
+function recAction(e){
+  var b=e.target.closest('button[data-act]'); if(!b) return;
+  var host=b.closest('.rec'); if(!host) return;
+  var id=host.getAttribute('data-id'), r=byId(id);
+  if(!r) return;
+  if(b.getAttribute('data-act')==='del'){
+    if(!confirm(jpShort(r.date)+'「'+r.part+'」の記録を削除しますか？')) return;
+    records=records.filter(function(x){ return x.id!==id; });
+    if(state.editingId===id) resetForm(false);
+    persist(); render();
+    return;
+  }
+  state.editingId=id; state.date=r.date; state.part=r.part; state.sev=r.sev; state.syms={};
+  (r.syms||[]).forEach(function(s){ if(SYMPTOMS.indexOf(s)>=0) state.syms[s]=1; });
+  $('symFree').value=(r.syms||[]).filter(function(s){ return SYMPTOMS.indexOf(s)<0; }).join('、');
+  $('memo').value=r.memo||'';
+  if(state.tab!=='record') $('tabs').querySelector('button[data-tab="record"]').click();
+  else render();
+  $('formCard').scrollIntoView({behavior:'smooth', block:'center'});
+}
+$('dayList').addEventListener('click',recAction);
+$('histList').addEventListener('click',recAction);
+['fPart','fSym','fRange','fSev'].forEach(function(id){ $(id).addEventListener('change',renderHistory); });
+
+$('mPrev').onclick=function(){ state.month.setMonth(state.month.getMonth()-1); renderCalendar(); };
+$('mNext').onclick=function(){ state.month.setMonth(state.month.getMonth()+1); renderCalendar(); };
+$('cal').addEventListener('click',function(e){
+  var c=e.target.closest('.cell[data-date]'); if(!c) return;
+  state.date=c.getAttribute('data-date');
+  $('tabs').querySelector('button[data-tab="record"]').click();
+});
+
+/* ---------------- data tab ---------------- */
+function download(name, text, type){
+  var b=new Blob([text],{type:type||'application/json'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(b); a.download=name;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.parentNode.removeChild(a); }, 0);
+}
+$('expJson').onclick=function(){ download('karada-log-'+today()+'.json', JSON.stringify(records,null,2)); };
+$('expCsv').onclick=function(){
+  var sorted=records.slice().sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:0; });
+  var rows=[['日付','部位','つらさ','症状','メモ']].concat(sorted.map(function(r){
+    return [r.date, r.part, r.sev, (r.syms||[]).join(' / '), (r.memo||'').replace(/\n/g,' ')];
+  }));
+  var csv='﻿'+rows.map(function(row){
+    return row.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(',');
+  }).join('\r\n');
+  download('karada-log-'+today()+'.csv', csv, 'text/csv');
+};
+$('impBtn').onclick=function(){ $('impFile').click(); };
+$('impFile').addEventListener('change',function(){
+  var f=this.files && this.files[0];
+  this.value='';
+  if(!f) return;
+  var rd=new FileReader();
+  rd.onload=function(){
+    var a;
+    try{ a=JSON.parse(rd.result); }catch(e){ a=null; }
+    if(!Array.isArray(a)){ alert('読み込めませんでした。このアプリで書き出したJSONファイルを選んでください。'); return; }
+    var clean=a.filter(function(r){ return r && r.date && r.part; }).map(function(r){
+      return { id:r.id||uid(), date:r.date, part:r.part, syms:Array.isArray(r.syms)?r.syms:[],
+               sev:Math.min(5,Math.max(1,+r.sev||3)), memo:r.memo||'', createdAt:r.createdAt||Date.now() };
+    });
+    if(!clean.length){ alert('有効な記録が見つかりませんでした。'); return; }
+    var addMode=confirm('OK：いまの記録に追加して読み込みます\nキャンセル：いまの記録を置き換えます');
+    if(addMode){
+      var have={};
+      records.forEach(function(r){ have[r.id]=1; });
+      clean.forEach(function(r){ if(!have[r.id]) records.push(r); });
+    }else{
+      records=clean;
+    }
+    persist(); render();
+    alert('読み込みました（'+clean.length+'件）');
+  };
+  rd.readAsText(f);
+});
+$('mkDoctor').onclick=function(){
+  var lim=daysAgo(29);
+  var list=records.filter(function(r){ return r.date>=lim; })
+                  .sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:(a.createdAt||0)-(b.createdAt||0); });
+  if(!list.length){ $('doctorText').value='直近30日の記録はありません。'; return; }
+  var byDate={}, order=[];
+  list.forEach(function(r){
+    if(!byDate[r.date]){ byDate[r.date]=[]; order.push(r.date); }
+    byDate[r.date].push(r);
+  });
+  var txt='【からだの記録】'+jpFull(order[0])+' 〜 '+jpFull(order[order.length-1])+'\n';
+  txt+='（記録 '+list.length+'件／'+order.length+'日分）\n\n';
+  order.forEach(function(d){
+    txt+='■ '+jpFull(d)+'\n';
+    byDate[d].forEach(function(r){
+      txt+='  ・'+r.part+'：つらさ '+r.sev+'/5'+((r.syms||[]).length?'（'+r.syms.join('、')+'）':'')+'\n';
+      if(r.memo) txt+='    '+r.memo.replace(/\n/g,'\n    ')+'\n';
+    });
+    txt+='\n';
+  });
+  $('doctorText').value=txt;
+};
+$('copyDoctor').onclick=function(){
+  var t=$('doctorText');
+  if(!t.value){ alert('先に「生成する」を押してください。'); return; }
+  t.removeAttribute('readonly');
+  t.focus(); t.select(); t.setSelectionRange(0, 999999);
+  var ok=false;
+  try{ ok=document.execCommand('copy'); }catch(e){ ok=false; }
+  t.setAttribute('readonly','readonly');
+  alert(ok?'コピーしました。':'コピーできませんでした。テキストを手動で選択してください。');
+};
+$('wipe').onclick=function(){
+  if(!records.length){ alert('記録はありません。'); return; }
+  if(!confirm('すべての記録（'+records.length+'件）を削除します。元に戻せません。よろしいですか？')) return;
+  if(!confirm('本当に削除してよろしいですか？')) return;
+  records=[]; persist(); resetForm(false); render();
+};
+
+render();
+})();
+
+/* オフライン用（file:// で直接開いたときは登録しない） */
+if('serviceWorker' in navigator && location.protocol.indexOf('http')===0){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+</script>
+</body>
+</html>
