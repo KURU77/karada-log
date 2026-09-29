@@ -53,9 +53,33 @@ header{
   position:sticky; top:0; z-index:20; background:var(--bg);
   padding:calc(12px + env(safe-area-inset-top)) 0 8px; border-bottom:1px solid var(--line);
 }
-.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 h1{font-size:19px;margin:0;letter-spacing:.02em}
 .brand small{color:var(--muted);font-size:12px}
+
+/* --- 同期 --- */
+.syncpill{margin-left:auto;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);
+  background:var(--panel);color:var(--muted);border-radius:999px;padding:6px 12px;font-size:13px;
+  font-family:inherit;cursor:pointer;min-height:36px;-webkit-appearance:none;appearance:none}
+.syncpill .sdot{width:8px;height:8px;border-radius:50%;background:var(--line);flex:0 0 auto}
+.syncpill.ok .sdot{background:#2fa37a}
+.syncpill.syncing .sdot{background:var(--accent);animation:pulse 1s ease-in-out infinite}
+.syncpill.login .sdot{background:#e8a33d}
+.syncpill.login{color:#c9821f;border-color:rgba(232,163,61,.5)}
+.syncpill.error .sdot{background:#dd4b4b}
+.syncpill.error{color:#dd4b4b;border-color:rgba(221,75,75,.45)}
+.syncpill.offline .sdot{background:var(--muted)}
+@keyframes pulse{50%{opacity:.3}}
+@media (prefers-reduced-motion: reduce){ .syncpill.syncing .sdot{animation:none} }
+.syncacct{display:flex;flex-direction:column;gap:2px;margin-bottom:12px}
+.syncacct b{font-size:15.5px;overflow-wrap:anywhere}
+.syncacct span{font-size:13px;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translate(-50%,12px);
+  z-index:60;max-width:calc(100% - 32px);background:#1c2026;color:#fff;padding:11px 16px;border-radius:12px;
+  font-size:14px;line-height:1.6;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;pointer-events:none;
+  transition:opacity .2s,transform .2s}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media (prefers-color-scheme: dark){ .toast{background:#e8eaee;color:#14161a} }
 nav{display:flex;gap:6px;margin-top:10px;overflow-x:auto;scrollbar-width:none}
 nav::-webkit-scrollbar{display:none}
 nav{-webkit-overflow-scrolling:touch}
@@ -266,6 +290,7 @@ label.fld{display:block;font-size:13px;color:var(--muted);margin:15px 0 7px;font
     <div class="brand">
       <h1>からだ記録</h1>
       <small id="brandSub"></small>
+      <button class="syncpill off" id="syncPill" aria-label="端末間の同期"><i class="sdot"></i><span id="syncPillText">同期する</span></button>
     </div>
     <nav id="tabs">
       <button data-tab="record" aria-selected="true">記録</button>
@@ -559,6 +584,7 @@ label.fld{display:block;font-size:13px;color:var(--muted);margin:15px 0 7px;font
 
   <!-- ============ データ ============ -->
   <section id="tab-data" class="hidden">
+    <div class="card" id="syncCard"></div>
     <div class="card">
       <h2>バックアップ</h2>
       <p class="hint" style="margin-top:0">記録はこの端末のブラウザ内（localStorage）にだけ保存されます。どこにも送信されません。端末の買い替えやブラウザデータの削除に備えて、ときどき書き出しておくと安心です。</p>
@@ -590,6 +616,8 @@ label.fld{display:block;font-size:13px;color:var(--muted);margin:15px 0 7px;font
   </section>
 </div>
 
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
 <div class="savebar" id="saveBar">
   <div class="inner">
     <button class="btn ghost hidden" id="cancelEdit">キャンセル</button>
@@ -604,6 +632,7 @@ label.fld{display:block;font-size:13px;color:var(--muted);margin:15px 0 7px;font
 /* ---------------- constants ---------------- */
 var KEY='karada-log-v1';
 var TX_KEY='karada-log-tx-v1';
+var DEL_KEY='karada-log-deleted';
 var SEV_COLORS=['','#8fd3b6','#f2d06b','#f0a35e','#e8794f','#dd4b4b'];
 var SEV_LABELS=['','ごく軽い','軽い','ふつう','強い','とても強い'];
 
@@ -676,14 +705,21 @@ function loadTx(){
     return Array.isArray(a)?a:[];
   }catch(e){ return []; }
 }
+/* 端末に書く。同期で取り込んだ内容を書くときもここを通す（更新時刻は押さない） */
+function writeAll(){
+  try{
+    localStorage.setItem(KEY, JSON.stringify(records));
+    localStorage.setItem(TX_KEY, JSON.stringify(treatments));
+    localStorage.setItem(DEL_KEY, JSON.stringify(DELETED));
+  }catch(e){ alert('保存できませんでした。ブラウザの空き容量やプライベートモードの設定をご確認ください。'); }
+}
+/* 利用者の操作で保存するとき：変わった記録に更新時刻を押し、消えた記録は墓標にしてから書く */
 function persist(){
-  try{ localStorage.setItem(KEY, JSON.stringify(records)); }
-  catch(e){ alert('保存できませんでした。ブラウザの空き容量やプライベートモードの設定をご確認ください。'); }
+  stampChanges();
+  writeAll();
+  syncSoon();
 }
-function persistTx(){
-  try{ localStorage.setItem(TX_KEY, JSON.stringify(treatments)); }
-  catch(e){ alert('保存できませんでした。ブラウザの空き容量やプライベートモードの設定をご確認ください。'); }
-}
+function persistTx(){ persist(); }
 function pad(n){ return (n<10?'0':'')+n; }
 function fmt(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
 function today(){ return fmt(new Date()); }
@@ -1335,6 +1371,357 @@ function renderAI(){
   aiScope();
 }
 
+/* ============================================================
+   端末間の同期（Google ドライブのアプリ専用領域）
+   ・データは本人の Google ドライブの「アプリ専用フォルダ」（appDataFolder）に置く。
+     ドライブの画面には出ず、このアプリ以外からは見えない。サーバーは使わない。
+   ・症状・治療の記録ごとに更新時刻 _u を持ち、削除は DELETED に墓標（id → 削除時刻）を残す。
+     同期のたびに双方をマージするので、オフラインで別々の端末を編集しても、
+     同じ記録でない限り両方の変更が残る。同じ記録なら、あとから保存したほうが残る。
+   ・AI相談の API キーは同期しない（端末ごとに入れる）。
+   ============================================================ */
+var GOOGLE_CLIENT_ID='1088975026923-gg6ra210l32ql6g7hllg6i11qei8agm9.apps.googleusercontent.com';  // 研究デスクと共通。公開してよい値
+var SCOPE='https://www.googleapis.com/auth/drive.appdata';
+var SYNC_FILE='karada-log.json';
+var SM_KEY='karada-log-sync', OAUTH_KEY='karada-log-oauth', SILENT_KEY='karada-log-silent';
+var DRIVE='https://www.googleapis.com/drive/v3/files', UPLOAD='https://www.googleapis.com/upload/drive/v3/files';
+
+var DELETED=(function(){
+  try{ var d=JSON.parse(localStorage.getItem(DEL_KEY)); return d && typeof d==='object' && !Array.isArray(d) ? d : {}; }
+  catch(e){ return {}; }
+})();
+var SHADOW={};
+
+/* ---- 変更の検出とマージ ---- */
+function eachRec(fn){ records.forEach(fn); treatments.forEach(fn); }
+function recSig(r){
+  var o={};
+  Object.keys(r).sort().forEach(function(k){ if(k!=='_u') o[k]=r[k]; });
+  return JSON.stringify(o);
+}
+function rebuildShadow(){
+  SHADOW={};
+  eachRec(function(r){ if(r.id){ if(!r._u) r._u=1; SHADOW[r.id]=recSig(r); } });
+}
+/* 前回の保存から変わった記録に時刻を押し、消えた記録は墓標にする */
+function stampChanges(){
+  var now=Date.now(), seen={};
+  eachRec(function(r){
+    if(!r.id) return;
+    seen[r.id]=1;
+    var sg=recSig(r);
+    if(SHADOW[r.id]!==sg){ r._u=now; SHADOW[r.id]=sg; }
+    else if(!r._u) r._u=1;   /* 中身が同じまま作り直された記録（取り込みなど）は基準値に */
+  });
+  Object.keys(SHADOW).forEach(function(id){
+    if(!seen[id]){ DELETED[id]=now; delete SHADOW[id]; }
+  });
+}
+function mergeList(a, b, del){
+  var out=[], byB={}, used={};
+  (b||[]).forEach(function(r){ if(r && r.id) byB[r.id]=r; });
+  function keep(r){ return !(del[r.id] && del[r.id] >= (r._u||0)); }
+  (a||[]).forEach(function(r){
+    if(!r || !r.id) return;
+    var o=byB[r.id]; used[r.id]=1;
+    var w=(o && (o._u||0) > (r._u||0)) ? o : r;
+    if(keep(w)) out.push(w);
+  });
+  (b||[]).forEach(function(r){
+    if(!r || !r.id || used[r.id]) return;
+    if(keep(r)) out.push(r);
+  });
+  return out;
+}
+function mergeDB(a, b){
+  var del={};
+  [a.deleted||{}, b.deleted||{}].forEach(function(d){
+    Object.keys(d).forEach(function(id){ del[id]=Math.max(del[id]||0, +d[id]||0); });
+  });
+  return {
+    records: mergeList(a.records, b.records, del),
+    treatments: mergeList(a.treatments, b.treatments, del),
+    deleted: del
+  };
+}
+function localDB(){ return { records:records, treatments:treatments, deleted:DELETED }; }
+/* 並び順やキーの順に左右されない形にそろえる（比較とアップロード用） */
+function canonList(list){
+  return (list||[]).slice().sort(function(a,b){ return a.id<b.id?-1:a.id>b.id?1:0; }).map(function(r){
+    var o={}; Object.keys(r).sort().forEach(function(k){ o[k]=r[k]; }); return o;
+  });
+}
+function syncPayload(d){
+  var del={};
+  Object.keys(d.deleted||{}).sort().forEach(function(k){ del[k]=d.deleted[k]; });
+  return JSON.stringify({ v:1, app:'karada-log', records:canonList(d.records), treatments:canonList(d.treatments), deleted:del });
+}
+
+/* ---- 認証（リダイレクト方式。ホーム画面に追加した iPhone でも動く） ---- */
+var SM=(function(){ try{ return JSON.parse(localStorage.getItem(SM_KEY)) || {}; }catch(e){ return {}; } })();
+function saveSM(){ lsSet(SM_KEY, JSON.stringify(SM)); }
+function tokenOK(){ return !!(SM.token && SM.exp && Date.now() < SM.exp); }
+function redirectURI(){ return location.origin + location.pathname.replace(/index\.html$/, ''); }
+function login(silent){
+  if(location.protocol==='file:'){
+    toast('ファイルを直接開いた状態ではログインできません。公開ページ（kuru77.github.io/karada-log/）から開いてください', 5200);
+    return;
+  }
+  if(/Instagram|FBAN|FBAV|Line\//i.test(navigator.userAgent)){
+    toast('アプリ内ブラウザでは Google にログインできません。「…」メニューから Safari や Chrome で開いてください', 5200);
+    return;
+  }
+  var st=uid()+uid();
+  try{ sessionStorage.setItem(OAUTH_KEY, JSON.stringify({ st:st, tab:state.tab, silent:!!silent })); }catch(e){}
+  var q={
+    client_id:GOOGLE_CLIENT_ID, redirect_uri:redirectURI(), response_type:'token',
+    scope:SCOPE, include_granted_scopes:'true', state:st
+  };
+  if(SM.email) q.login_hint=SM.email;
+  if(silent) q.prompt='none';
+  location.href='https://accounts.google.com/o/oauth2/v2/auth?'+new URLSearchParams(q).toString();
+}
+/* 起動時：Google から戻ってきたところならトークンを受け取る。戻り先のタブを返す */
+function takeOAuthReturn(){
+  var h=location.hash;
+  if(h.indexOf('access_token=')<0 && h.indexOf('error=')<0) return '';
+  var q=new URLSearchParams(h.replace(/^#\/?/, ''));
+  var saved={};
+  try{ saved=JSON.parse(sessionStorage.getItem(OAUTH_KEY)) || {}; sessionStorage.removeItem(OAUTH_KEY); }catch(e){}
+  history.replaceState(null, '', location.pathname + location.search);
+  if(!q.get('state') || q.get('state')!==saved.st) return '';
+  if(q.get('error')){
+    SM.needLogin=true; saveSM();
+    if(!saved.silent){
+      SYNC.flash = q.get('error')==='access_denied' ? 'ログインを取りやめました' : 'ログインできませんでした（'+q.get('error')+'）';
+    }
+    return saved.tab || '';
+  }
+  if((q.get('scope')||'').indexOf('drive.appdata')<0){
+    SYNC.flash='Google ドライブへのアクセスが許可されませんでした。確認画面でドライブの項目にチェックを入れてください';
+    return saved.tab || '';
+  }
+  SM.token=q.get('access_token');
+  SM.exp=Date.now() + (Math.max(60, +q.get('expires_in') || 3600) - 120) * 1000;
+  SM.signedIn=true; SM.needLogin=false; saveSM();
+  SYNC.justLoggedIn=true;
+  return saved.tab || '';
+}
+function logout(){
+  if(SM.token) fetch('https://oauth2.googleapis.com/revoke?token='+encodeURIComponent(SM.token), { method:'POST', mode:'no-cors' }).catch(function(){});
+  SM={}; saveSM();
+  setSyncState('off');
+}
+
+/* ---- Google ドライブ API ---- */
+function gfetch(url, opts){
+  opts=opts||{};
+  opts.headers=Object.assign({ Authorization:'Bearer '+SM.token }, opts.headers||{});
+  return fetch(url, opts).then(function(r){
+    if(!r.ok){ var e=new Error('Google ドライブ '+r.status); e.status=r.status; throw e; }
+    return r;
+  });
+}
+function driveList(){
+  var all=[];
+  function page(tok){
+    var u=DRIVE+'?spaces=appDataFolder&pageSize=100&fields='+encodeURIComponent('nextPageToken,files(id,name)')
+        + (tok ? '&pageToken='+encodeURIComponent(tok) : '');
+    return gfetch(u).then(function(r){ return r.json(); }).then(function(j){
+      all=all.concat(j.files||[]);
+      return j.nextPageToken ? page(j.nextPageToken) : all;
+    });
+  }
+  return page('');
+}
+function driveGet(id){ return gfetch(DRIVE+'/'+encodeURIComponent(id)+'?alt=media', { cache:'no-store' }).then(function(r){ return r.json(); }); }
+function driveCreate(name, body){
+  var b='karada'+uid();
+  var meta=JSON.stringify({ name:name, parents:['appDataFolder'] });
+  var blob=new Blob(['--'+b+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+meta+'\r\n--'+b
+    + '\r\nContent-Type: application/json\r\n\r\n', body, '\r\n--'+b+'--']);
+  return gfetch(UPLOAD+'?uploadType=multipart&fields=id', {
+    method:'POST', headers:{ 'Content-Type':'multipart/related; boundary='+b }, body:blob
+  }).then(function(r){ return r.json(); });
+}
+function driveUpdate(id, body){
+  return gfetch(UPLOAD+'/'+encodeURIComponent(id)+'?uploadType=media', {
+    method:'PATCH', headers:{ 'Content-Type':'application/json' }, body:body
+  });
+}
+function driveDelete(id){
+  return gfetch(DRIVE+'/'+encodeURIComponent(id), { method:'DELETE' }).catch(function(e){ if(e.status!==404) throw e; });
+}
+function driveAbout(){
+  return gfetch('https://www.googleapis.com/drive/v3/about?fields='+encodeURIComponent('user(emailAddress,displayName)'))
+    .then(function(r){ return r.json(); });
+}
+
+/* ---- 同期本体 ---- */
+var SYNC={ running:false, again:false, timer:0, state:'off', detail:'', flash:'', justLoggedIn:false, applying:false };
+/* 編集の途中で記録を差し替えると、編集中の内容が迷子になるので待つ */
+function uiBusy(){ return !!(state.editingId || txState.editingId); }
+function agoLabel(t){
+  var m=Math.round((Date.now()-t)/60000);
+  if(m<1) return 'たった今';
+  if(m<60) return m+'分前';
+  var h=Math.round(m/60);
+  if(h<24) return h+'時間前';
+  return jpShort(fmt(new Date(t)));
+}
+function syncLabel(){
+  return {
+    off:'同期していません',
+    ok:'同期済み'+(SM.last?'（'+agoLabel(SM.last)+'）':''),
+    syncing:'同期中…',
+    login:'再ログインが必要です',
+    error:'同期できませんでした：'+SYNC.detail,
+    offline:'オフライン（つながったら同期します）'
+  }[SYNC.state] || '';
+}
+function setSyncState(st, detail){
+  SYNC.state=st; SYNC.detail=detail||'';
+  var p=$('syncPill');
+  p.className='syncpill '+(SM.signedIn ? st : 'off');
+  $('syncPillText').textContent = !SM.signedIn ? '同期する'
+    : { ok:'同期済み', syncing:'同期中', login:'要ログイン', error:'同期エラー', offline:'オフライン', off:'同期する' }[st] || '同期';
+  p.title = SM.signedIn ? syncLabel() : 'Google アカウントで端末間の同期';
+  var el=$('syncStatus'); if(el) el.textContent=syncLabel();
+}
+function syncSoon(ms){
+  if(!SM.signedIn || SYNC.applying) return;
+  clearTimeout(SYNC.timer);
+  SYNC.timer=setTimeout(function(){ syncNow(false); }, ms==null ? 3000 : ms);
+}
+function applyMerged(m){
+  SYNC.applying=true;
+  records=m.records; treatments=m.treatments; DELETED=m.deleted;
+  writeAll(); rebuildShadow();
+  SYNC.applying=false;
+}
+function syncNow(interactive){
+  if(!SM.signedIn){ if(interactive) login(false); return Promise.resolve(); }
+  if(!tokenOK()){
+    if(interactive) login(false); else setSyncState('login');
+    return Promise.resolve();
+  }
+  if(!navigator.onLine){ setSyncState('offline'); return Promise.resolve(); }
+  if(SYNC.running){ SYNC.again=true; return Promise.resolve(); }
+  if(uiBusy()){ syncSoon(4000); return Promise.resolve(); }
+
+  SYNC.running=true; setSyncState('syncing');
+  var changedView=false;
+  return driveList().then(function(files){
+    var jsons=files.filter(function(x){ return x.name===SYNC_FILE; });
+    var remote=null, remoteStr='';
+    /* 2台が同時に初回同期するとファイルが2つできることがある。全部合わせて1つにまとめる */
+    return jsons.reduce(function(pr, fl){
+      return pr.then(function(){
+        return driveGet(fl.id).then(function(d){ remote = remote ? mergeDB(remote, d) : d; });
+      });
+    }, Promise.resolve()).then(function(){
+      if(remote){
+        remoteStr=syncPayload(remote);
+        if(uiBusy()){ var e=new Error('busy'); e.busy=true; throw e; }
+        var m=mergeDB(localDB(), remote);
+        if(syncPayload(m)!==syncPayload(localDB())){ applyMerged(m); changedView=true; }
+      }
+      var mine=syncPayload(localDB());
+      var w=null;
+      if(!jsons.length) w=driveCreate(SYNC_FILE, mine);
+      else if(mine!==remoteStr || jsons.length>1) w=driveUpdate(jsons[0].id, mine);
+      return Promise.resolve(w).then(function(){
+        return Promise.all(jsons.slice(1).map(function(x){ return driveDelete(x.id); }));
+      });
+    });
+  }).then(function(){
+    SM.last=Date.now(); saveSM();
+    setSyncState('ok');
+    if(changedView) render();
+  }).catch(function(e){
+    SYNC.applying=false;
+    if(e.busy){ syncSoon(4000); setSyncState('ok'); }
+    else if(e.status===401 || e.status===403){ SM.token=''; SM.exp=0; saveSM(); setSyncState('login'); }
+    else if(!navigator.onLine) setSyncState('offline');
+    else setSyncState('error', e.message || '通信エラー');
+  }).then(function(){
+    SYNC.running=false;
+    if(SYNC.again){ SYNC.again=false; syncSoon(500); }
+  });
+}
+function syncStartup(){
+  if(SYNC.flash){ toast(SYNC.flash, 5200); SYNC.flash=''; }
+  if(!SM.signedIn){ setSyncState('off'); return; }
+  if(SYNC.justLoggedIn){
+    SYNC.justLoggedIn=false;
+    driveAbout().then(function(a){
+      if(a.user){ SM.email=a.user.emailAddress; SM.name=a.user.displayName; saveSM(); renderSync(); }
+    }).catch(function(){});
+    toast('ログインしました。この端末の記録とクラウドの記録を合わせます');
+    syncNow(false);
+    return;
+  }
+  if(tokenOK()){ syncNow(false); return; }
+  /* トークン切れ：オンラインなら Google に黙って取り直しに行く（10分に1回まで） */
+  var last=+(lsGet(SILENT_KEY)||0);
+  if(navigator.onLine && !SM.needLogin && Date.now()-last > 10*60000){
+    lsSet(SILENT_KEY, String(Date.now()));
+    login(true);
+  }else setSyncState('login');
+}
+document.addEventListener('visibilitychange', function(){
+  if(!SM.signedIn) return;
+  if(document.visibilityState==='visible') syncSoon(300);
+  else if(tokenOK() && !SYNC.running) syncNow(false);
+});
+window.addEventListener('online', function(){ syncSoon(500); });
+
+/* ---- 画面 ---- */
+var toastTimer=0;
+function toast(msg, ms){
+  var t=$('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){ t.classList.remove('show'); }, ms||2800);
+}
+function renderSync(){
+  var h='<h2>端末間の同期</h2>';
+  if(!SM.signedIn){
+    h+='<p class="hint" style="margin-top:0">Google アカウントでログインすると、パソコン・iPad・iPhone で同じ記録を使えます。'
+      + '記録は自分の Google ドライブの<strong>アプリ専用領域</strong>（ドライブの画面には出ない場所）に保存され、このアプリ以外からは見えません。</p>'
+      + '<button class="btn primary" data-sync="login" style="width:100%;margin-top:6px">Google でログイン</button>'
+      + '<p class="hint">ほかの端末でも同じアカウントでログインしてください。はじめてログインした端末では、その端末の記録とクラウドの記録を合わせます（どちらも消えません）。<br>'
+      + 'Instagram・LINE のアプリ内ブラウザではログインできません。Safari や Chrome で開いてください。<br>'
+      + 'AI相談の API キーは同期しません（端末ごとに入力）。</p>';
+  }else{
+    h+='<div class="syncacct"><b>'+esc(SM.email || 'Google アカウント')+'</b><span id="syncStatus">'+esc(syncLabel())+'</span></div>'
+      + '<div class="row"><button class="btn" data-sync="now" style="flex:1">今すぐ同期</button>'
+      + '<button class="btn" data-sync="logout">ログアウト</button></div>'
+      + '<p class="hint">記録は保存の数秒後に自動で送られ、アプリを開いたとき・画面に戻ったときにほかの端末の変更を取り込みます。'
+      + '別々の端末で同じ記録を編集した場合は、あとから保存したほうが残ります。<br>'
+      + 'ログインの有効期限は約1時間で、切れたら自動で取り直します。取り直せないときは上の「今すぐ同期」からログインしてください。</p>';
+  }
+  $('syncCard').innerHTML=h;
+}
+$('syncCard').addEventListener('click', function(e){
+  var b=e.target.closest('button[data-sync]'); if(!b) return;
+  var a=b.getAttribute('data-sync');
+  if(a==='login') login(false);
+  else if(a==='now'){ syncNow(true); }
+  else if(a==='logout'){
+    if(!confirm('この端末の同期をやめますか？\n（記録はこの端末にもクラウドにも残ります）')) return;
+    logout(); renderSync(); toast('ログアウトしました');
+  }
+});
+$('syncPill').onclick=function(){
+  if(!SM.signedIn){
+    $('tabs').querySelector('button[data-tab="data"]').click();
+    return;
+  }
+  if(SYNC.state==='login'){ login(false); return; }
+  syncNow(true);
+};
+
 /* ---------------- render ---------------- */
 function render(){
   $('date').value=state.date;
@@ -1347,6 +1734,7 @@ function render(){
   if(state.tab==='stats') renderStats();
   if(state.tab==='compare') renderCompare();
   if(state.tab==='ai') renderAI();
+  if(state.tab==='data') renderSync();
   $('saveBar').classList.toggle('hidden', state.tab!=='record');
 }
 
@@ -1691,6 +2079,7 @@ $('copyDoctor').onclick=function(){
 $('wipe').onclick=function(){
   if(!records.length && !treatments.length){ alert('記録はありません。'); return; }
   if(!confirm('すべての記録（症状 '+records.length+'件・治療歴 '+treatments.length+'件）を削除します。'
+            + (SM.signedIn ? '同期しているほかの端末からも削除されます。' : '')
             + '元に戻せません。よろしいですか？')) return;
   if(!confirm('本当に削除してよろしいですか？')) return;
   records=[]; treatments=[];
@@ -1709,7 +2098,14 @@ resetTxForm();
   sel.value=m;
 })();
 
+var backTab=takeOAuthReturn();
+rebuildShadow();
 render();
+if(backTab && backTab!=='record'){
+  var bt=$('tabs').querySelector('button[data-tab="'+backTab+'"]');
+  if(bt) bt.click();
+}
+syncStartup();
 })();
 
 /* オフライン用（file:// で直接開いたときは登録しない） */
